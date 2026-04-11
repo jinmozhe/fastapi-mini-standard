@@ -114,9 +114,9 @@ def register_middlewares(app: FastAPI) -> None:
             allow_headers=["*"],
         )
 
-    # 2. Audit Log (后台操作审计，待实现后启用)
-    # from app.core.audit import AuditLogMiddleware
-    # app.add_middleware(AuditLogMiddleware)
+    # 2. Audit Log（B端管理员操作审计，拦截 /admin/ 写操作并旁路落库）
+    from app.core.audit import AuditLogMiddleware
+    app.add_middleware(AuditLogMiddleware)
 
     # 3. Request Log & ID (建议最后注册，以便最先拦截请求并注入 request_id)
     app.add_middleware(RequestLogMiddleware)

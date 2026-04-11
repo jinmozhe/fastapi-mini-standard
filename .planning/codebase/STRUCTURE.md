@@ -1,138 +1,85 @@
-# 目录结构 (STRUCTURE)
+# STRUCTURE.md — 项目目录结构
 
-## 项目根目录
-
+## 根目录
 ```
-fastapi-mini-standard/
-├── .env                          # 环境变量 (被 .gitignore 忽略)
-├── .env.example                  # 环境变量模板 (103 行, 配置契约)
-├── .gitignore                    # Git 忽略规则 (100 行)
-├── .importlinter                 # 导入规则强制约束 (67 行)
-├── pyproject.toml                # 项目依赖 + 工具配置 (116 行)
-├── requirements.txt              # 锁定依赖清单 (45 行)
-├── README.md                     # 项目说明文档 (16KB)
-├── 可运行项目模板使用说明.md       # 中文使用说明
-├── Dockerfile                    # Docker 构建 (空)
-├── docker-compose.yml            # Docker 编排 (空)
-├── alembic.ini                   # Alembic 迁移配置 (48 行)
-├── alembic/                      # 数据库迁移
-│   └── env.py                    # 迁移环境 (121 行, Psycopg3 同步方式)
-└── app/                          # 应用主目录
-    ├── __init__.py               # 包标记
-    ├── main.py                   # 应用入口 + 工厂函数 (130 行)
-    ├── api_router.py             # 路由聚合层 (44 行)
-    ├── api/                      # 全局 API 层
-    │   ├── __init__.py
-    │   └── deps.py               # 全局依赖注入 (133 行)
-    ├── core/                     # 横切关注点
-    │   ├── config.py             # 配置管理 (165 行)
-    │   ├── error_code.py         # 错误码基类 + 系统错误码 (75 行)
-    │   ├── exceptions.py         # 业务异常 + 全局异常处理器 (218 行)
-    │   ├── logging.py            # Loguru 日志配置 (136 行)
-    │   ├── middleware.py         # 中间件 (123 行)
-    │   ├── redis.py              # Redis 客户端管理 (59 行)
-    │   ├── response.py           # 统一响应信封 (84 行)
-    │   └── security.py           # 密码 + JWT 工具 (129 行)
-    ├── db/                       # 数据访问层
-    │   ├── session.py            # AsyncEngine + SessionFactory (78 行)
-    │   ├── models/               # ORM 模型
-    │   │   ├── __init__.py       # 模型注册表 (49 行)
-    │   │   ├── base.py           # 基类 + Mixin (175 行)
-    │   │   └── user.py           # 用户模型 (105 行)
-    │   └── repositories/         # 仓储层
-    │       ├── __init__.py
-    │       └── base.py           # 通用 CRUD Repository (168 行)
-    ├── domains/                  # 业务领域
-    │   ├── __init__.py
-    │   ├── auth/                 # 认证领域
-    │   │   ├── constants.py      # 错误码 + 成功提示 (79 行)
-    │   │   ├── router.py         # 路由 (161 行)
-    │   │   ├── schemas.py        # 数据模型 (85 行)
-    │   │   └── service.py        # 服务层 (213 行)
-    │   └── users/                # 用户领域
-    │       ├── __init__.py
-    │       ├── constants.py      # 错误码 + 成功提示 (38 行)
-    │       ├── dependencies.py   # 依赖注入链 (57 行)
-    │       ├── repository.py     # 用户仓储 (84 行)
-    │       ├── router.py         # 路由 (109 行)
-    │       ├── schemas.py        # 数据模型 (119 行)
-    │       └── service.py        # 服务层 (118 行)
-    ├── services/                 # 跨域服务层 (当前为空)
-    │   └── __init__.py
-    ├── utils/                    # 工具集
-    │   ├── __init__.py
-    │   └── masking.py            # PII 数据脱敏 (128 行)
-    └── static/                   # 静态资源 (ReDoc JS/Favicon)
+e:\fastapi\fastapi-mini-standard\
+├── .agent/                      # GSD 工作流引擎（提交到 Git）
+│   ├── skills/                  # GSD 技能定义
+│   ├── get-shit-done/           # GSD 核心工作流
+│   ├── scratch/                 # AI 临时沙盒（.gitignore 排除）
+│   └── settings.json            # GSD 配置
+├── .claude/skills/              # 项目级 AI 开发规范
+│   └── fastapi-standard.md      # FastAPI 工程标准（实现期检查清单）
+├── .planning/codebase/          # GSD 代码库地图（本文件所在目录）
+├── .venv/                       # Python 虚拟环境（不提交）
+├── .vscode/                     # VS Code 配置（不提交）
+├── alembic/                     # 数据库迁移
+│   ├── env.py                   # 迁移环境配置（同步 psycopg 驱动）
+│   ├── script.py.mako           # 迁移脚本模板
+│   └── versions/                # 迁移版本文件（必须提交）
+├── app/                         # 应用主目录
+├── .env                         # 环境变量（不提交，含敏感信息）
+├── .env.example                 # 环境变量模板（提交）
+├── .gitignore                   # Git 忽略规则
+├── .importlinter                # 架构约束（禁止跨域导入）
+├── alembic.ini                  # Alembic 入口配置
+├── pyproject.toml               # 项目元信息 + 工具配置
+├── uv.lock                      # 精确版本锁（提交）
+├── Dockerfile                   # 容器化
+├── docker-compose.yml           # Docker 编排
+└── README.md                    # 项目文档
 ```
 
-## 关键文件索引
+## app/ 应用目录
+```
+app/
+├── __init__.py
+├── main.py                      # FastAPI 工厂函数 + Lifespan
+├── api_router.py                # 路由聚合（挂载所有 domain router）
+├── api/
+│   └── deps.py                  # 全局依赖注入（DBSession, CurrentUser, SuperUser）
+├── core/                        # 横切关注点
+│   ├── config.py                # Settings（pydantic-settings, .env 加载）
+│   ├── security.py              # Argon2id 密码哈希 + JWT 签发
+│   ├── exceptions.py            # AppException + 全局异常处理器（4 层拦截）
+│   ├── error_code.py            # BaseErrorCode 枚举基类 + SystemErrorCode
+│   ├── response.py              # ResponseModel[T] 统一响应信封
+│   ├── middleware.py            # RequestLogMiddleware + CORS 注册
+│   ├── logging.py               # Loguru 配置（接管 Uvicorn 日志）
+│   └── redis.py                 # Redis 单例客户端 + 依赖注入
+├── db/
+│   ├── models/
+│   │   ├── __init__.py          # 导出 Base（Alembic 扫描入口）
+│   │   ├── base.py              # ORM 基类（UUIDBase, UUIDModel, Mixins, sort_order 排序）
+│   │   └── user.py              # User 模型（phone_code + mobile 复合唯一）
+│   ├── repositories/
+│   │   └── base.py              # BaseRepository[T, CreateSchema, UpdateSchema] 泛型仓储
+│   └── session.py               # AsyncEngine + AsyncSessionLocal 工厂
+├── domains/
+│   ├── auth/                    # 认证领域
+│   │   ├── router.py            # POST /login, /register, /refresh, /logout
+│   │   ├── schemas.py           # LoginRequest, RegisterRequest, Token, RefreshRequest
+│   │   ├── service.py           # AuthService（注册、登录、刷新、登出）
+│   │   └── constants.py         # AuthError 错误码 + AuthMsg 消息常量
+│   └── users/                   # 用户领域
+│       ├── router.py            # GET /me, PUT /me, DELETE /me, GET /{id}, GET /list
+│       ├── schemas.py           # UserBase, UserUpdate, UserRead + 校验常量
+│       ├── service.py           # UserService（查询、更新、软删除）
+│       ├── repository.py        # UserRepository（get_by_mobile, get_by_email 等）
+│       └── constants.py         # UserError 错误码 + UserMsg 消息常量
+├── services/                    # 跨领域服务（预留，当前为空）
+│   └── __init__.py
+├── static/                      # 静态资源
+│   ├── redoc.standalone.js      # ReDoc 本地化 JS
+│   └── favicon.png              # 网站图标
+└── utils/                       # 工具函数（预留）
+```
 
-### 配置与启动
-
-| 文件 | 职责 |
+## 关键路径速查
+| 场景 | 文件 |
 |---|---|
-| `app/main.py` | 应用工厂, 生命周期, 组件注册 |
-| `app/core/config.py` | 全局配置单例 (`settings`) |
-| `app/api_router.py` | 路由聚合 (auth, users, admin) |
-| `.env.example` | 配置契约模板 |
-
-### 基础设施
-
-| 文件 | 职责 |
-|---|---|
-| `app/db/session.py` | 数据库引擎 + 会话工厂 |
-| `app/core/redis.py` | Redis 客户端单例 |
-| `app/core/middleware.py` | Request ID + Access Log + CORS |
-| `app/core/logging.py` | Loguru 配置 (拦截 stdlib) |
-| `app/core/security.py` | 密码哈希 (Argon2) + JWT 签发 |
-
-### 核心抽象
-
-| 文件 | 职责 |
-|---|---|
-| `app/db/models/base.py` | ORM 基类 + Mixin (UUID, Timestamp, SoftDelete) |
-| `app/db/repositories/base.py` | 通用 CRUD Repository (泛型) |
-| `app/core/response.py` | 统一响应信封 `ResponseModel[T]` |
-| `app/core/error_code.py` | 错误码枚举基类 `BaseErrorCode` |
-| `app/core/exceptions.py` | 业务异常 `AppException` + 全局处理器 |
-
-## 命名约定
-
-### 文件命名
-
-| 类型 | 约定 | 示例 |
-|---|---|---|
-| 领域模块文件 | `router.py` / `service.py` / `schemas.py` / `repository.py` / `constants.py` / `dependencies.py` | 固定文件名, 跨领域一致 |
-| ORM 模型 | `snake_case.py` | `user.py`, `base.py` |
-| 配置/工具 | `snake_case.py` | `config.py`, `masking.py` |
-
-### 类命名
-
-| 类型 | 约定 | 示例 |
-|---|---|---|
-| ORM 模型 | `PascalCase` (单数) | `User`, `UserProfile` |
-| Repository | `{Model}Repository` | `UserRepository` |
-| Service | `{Domain}Service` | `AuthService`, `UserService` |
-| Schema | `{Model}{Action}` | `UserRead`, `UserUpdate`, `LoginRequest` |
-| 错误码 | `{Domain}Error(BaseErrorCode)` | `AuthError`, `UserError` |
-| 提示语 | `{Domain}Msg` | `AuthMsg`, `UserMsg` |
-| 依赖别名 | `{Type}Dep` | `AuthServiceDep`, `UserServiceDep` |
-
-### 表命名
-
-- ORM 类名自动转 `snake_case` (via `resolve_table_name`)
-- `User` 类手动覆盖为 `users` (复数)
-- 约束命名约定: `ix_`, `uq_`, `ck_`, `fk_`, `pk_` 前缀
-
-### 领域模块标准结构
-
-```
-app/domains/{domain_name}/
-├── __init__.py       # (可选)
-├── constants.py      # 错误码 + 成功消息
-├── dependencies.py   # 依赖注入链 (Repo → Service → Dep)
-├── repository.py     # 数据访问
-├── router.py         # HTTP 路由
-├── schemas.py        # Pydantic 输入/输出
-└── service.py        # 业务逻辑
-```
+| 添加新业务域 | `app/domains/{name}/` (router, schemas, service, repository, constants) + `app/api_router.py` 注册 |
+| 新增 ORM 模型 | `app/db/models/{name}.py` + `app/db/models/__init__.py` 导入 |
+| 修改全局配置 | `app/core/config.py` + `.env` |
+| 新增错误码 | `app/domains/{name}/constants.py` (继承 `BaseErrorCode`) |
+| Alembic 迁移 | `alembic revision --autogenerate -m "..."` + `alembic upgrade head` |

@@ -1,94 +1,37 @@
-# 测试 (TESTING)
+# TESTING.md — 测试策略
 
-## 测试框架
-
-| 工具 | 版本要求 | 用途 |
-|---|---|---|
-| pytest | >=8.2.0 | 测试框架 |
-| pytest-asyncio | >=0.23.0 | 异步测试支持 |
-| httpx | >=0.27.0 | 异步 HTTP 测试客户端 |
-
-## Pytest 配置
-
-```toml
-# pyproject.toml
-[tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-ra -q --asyncio-mode=auto"
-testpaths = ["tests"]
-python_files = "test_*.py"
-asyncio_default_fixture_loop_scope = "session"
-```
-
-关键设置:
-- `--asyncio-mode=auto`: 自动标记异步测试函数
-- `asyncio_default_fixture_loop_scope = "session"`: 默认 fixture 作用域为 session
-- 测试目录: `tests/` (根目录级别)
+## 框架与配置
+- **测试框架**: Pytest ≥8.2.0
+- **异步支持**: pytest-asyncio ≥0.23.0（`asyncio_mode=auto`）
+- **HTTP 客户端**: httpx ≥0.27.0（用于 API 端到端测试）
+- **配置位置**: `pyproject.toml` → `[tool.pytest.ini_options]`
+- **测试目录**: `tests/`（`testpaths = ["tests"]`）
+- **Fixture 作用域**: `asyncio_default_fixture_loop_scope = "session"`
 
 ## 当前测试状态
+> ⚠️ **`tests/` 目录当前不存在**。项目处于基础架构搭建阶段，尚未编写业务测试。
 
-**⚠️ `tests/` 目录尚未创建。** 项目当前处于模板阶段, 测试基础设施已在配置中就绪, 但尚未编写实际测试。
-
-## 预期测试模式
-
-### 单元测试
-
-基于项目架构, 预期的测试模式:
-
-```python
-# 使用 httpx.AsyncClient 测试 API
-async with AsyncClient(app=app, base_url="http://test") as ac:
-    response = await ac.post("/api/v1/auth/login", json={...})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["code"] == "success"
+## 建议的测试结构
+```
+tests/
+├── conftest.py              # 全局 Fixture（TestClient, 测试 DB Session, Mock Redis）
+├── test_auth/
+│   ├── test_register.py     # 注册流程（默认/自定义 phone_code, 唯一性冲突）
+│   ├── test_login.py        # 登录（正常, 错误密码, 账号锁定）
+│   └── test_refresh.py      # Token 刷新（正常, 过期, 重放）
+└── test_users/
+    ├── test_get_user.py     # 获取用户（正常, 软删除, 未授权）
+    └── test_update_user.py  # 更新用户（唯一性冲突, 密码修改）
 ```
 
-### Mock 策略
+## 关键测试场景
+1. **phone_code 默认值注入**: 不传/传空 → 自动补全为 `+86`
+2. **复合唯一约束**: 相同 `phone_code` + `mobile` 重复注册 → 409
+3. **Token Rotation**: 使用 Refresh Token 后旧 Token 失效
+4. **软删除隔离**: 软删除用户不应出现在查询结果中
+5. **字段校验边界**: `mobile` 非纯数字、长度 <5 或 >15 → 400
 
-- **数据库**: Override `get_db` 依赖, 注入测试 Session
-- **Redis**: Override `get_redis` 依赖, 注入 Mock Redis
-- **密码哈希**: 测试时可降低 Argon2 参数加速
-
-### 测试覆盖范围 (待实现)
-
-| 层级 | 测试类型 | 关注点 |
-|---|---|---|
-| Router | API 集成测试 | 端点响应格式、HTTP 状态码 |
-| Service | 单元测试 | 业务逻辑、唯一性校验、事务 |
-| Repository | 集成测试 | SQL 查询正确性、软删除过滤 |
-| Core | 单元测试 | JWT、密码哈希、错误处理 |
-
-## 代码质量工具
-
-### Ruff (Lint + Format)
-
-```bash
-# Lint
-ruff check .
-
-# Format
-ruff format .
-```
-
-### Mypy (类型检查)
-
-```bash
-mypy app/
-```
-
-### import-linter (架构约束)
-
-```bash
-lint-imports
-```
-
-验证内容:
-1. 领域模块间独立性
-2. 分层架构顺序
-3. 无循环依赖
-4. Service 不直接导入 ORM Models
-
-### Pre-commit (Git Hooks)
-
-配置了 `pre-commit>=3.7.0`, 预期与 Ruff + Mypy 集成。
+## 代码质量保障
+- **import-linter**: `.importlinter` 配置了 5 条架构约束
+- **Mypy**: 严格模式，强制类型注解，禁止未类型化定义
+- **Ruff**: 集成了异步代码审计 (`ASYNC`) 和禁止盲捕获 (`BLE`)

@@ -17,6 +17,8 @@ import secrets
 from datetime import timedelta
 
 from redis.asyncio import Redis
+from redis.exceptions import ResponseError
+from uuid6 import uuid7
 
 from app.core.config import settings
 from app.core.error_code import SystemErrorCode
@@ -147,25 +149,50 @@ class AuthService:
 
     async def refresh_token(self, refresh_token: str) -> Token:
         """
-        使用 Refresh Token 换取新 Token (Token Rotation)。
-
-        流程:
-        1. 查 Redis 确认 token 有效性
-        2. 若无效/过期，抛出 401
-        3. 销毁旧 Token (防重放)
-        4. 签发全新的一对 Access + Refresh Token
+        使用 Refresh Token 换取新 Token (会话族谱追踪方案)。
         """
-        redis_key = f"refresh_token:{refresh_token}"
-        # 使用原生原子操作 getdel，获取并立刻销毁，从物理层面防止并发重放
-        user_id = await self.redis.getdel(redis_key)
-
-        if not user_id:
-            # Token 无效属于系统级认证失败，使用 SystemErrorCode.UNAUTHORIZED (HTTP 401)
-            raise AppException(
-                SystemErrorCode.UNAUTHORIZED, message="Refresh token 无效或已过期"
+        # 1. 原子 RENAME：尝试将 Token 标记为消费状态
+        # 如果 Token 存在，则它成功转移到 consumed_token:* 中，避免了任何并发导致的同时刷新
+        try:
+            await self.redis.rename(
+                f"refresh_token:{refresh_token}", 
+                f"consumed_token:{refresh_token}"
             )
+            # RENAME 成功，我们赢得了并发锁！当前请求是唯一合法的刷新者。
+            # 解析背后的族谱信息 (因为存入 redis 时一定会被 decode 成 str，所以这里收到的是 str)
+            val = await self.redis.get(f"consumed_token:{refresh_token}")
+            
+            if not val:
+                raise AppException(SystemErrorCode.UNAUTHORIZED, message="Refresh token 族谱破坏")
+                
+            # (作为防御性代码) 续期这个被消费标记 Token 的 TTL，用来做后续钓鱼
+            await self.redis.expire(f"consumed_token:{refresh_token}", timedelta(days=7))
+            
+            session_id, user_id = val.split(":")
+            
+        except ResponseError:
+            # RENAME 失败 (通常是因为 key 不存在)
+            # 有两种可能：是真的过期了，或者是已经被（黑客/本人的旧设备）用过了被挪到了 consumed 里。
+            val = await self.redis.get(f"consumed_token:{refresh_token}")
+            
+            if val:
+                # 💥 钓鱼成功：有人试图使用一张已经消费过的旧车票！这是重放或 Token 泄露！
+                session_id, user_id = val.split(":")
+                
+                # 诛连机制：找到该 session 目前合法的“那颗果子”，直接删除！
+                active_token = await self.redis.get(f"session_active:{session_id}")
+                if active_token:
+                    await self.redis.delete(f"refresh_token:{active_token}")
+                
+                await self.redis.delete(f"session_active:{session_id}")
+                
+                # 抛出最高安全级别异常，前端应当强制下线并提示用户修改密码
+                raise AppException(AuthError.TOKEN_THEFT_DETECTED)
+            else:
+                # 连 consumed 里都没有，那就是确实没登录或真过期了
+                raise AppException(SystemErrorCode.UNAUTHORIZED, message="Refresh token 无效或已过期")
 
-        # 强制查库校验：确保被软删除或封禁的用户无法继续续签无限获取 Access Token
+        # 2. 强制查库校验：确保被软删除或封禁的用户无法继续续签
         user = await self.user_repo.get(user_id)
         
         if not user or user.is_deleted:
@@ -178,35 +205,50 @@ class AuthService:
                 SystemErrorCode.UNAUTHORIZED, message="用户已被禁用/封禁"
             )
 
-        # 签发新 Token
-        return await self._create_tokens(user_id=user_id)
+        # 3. 带着继承的族谱 session_id，签发新 Token 替代，树重新生效
+        return await self._create_tokens(user_id=user_id, session_id=session_id)
 
     async def logout(self, refresh_token: str) -> None:
         """
         用户登出。
-        直接从 Redis 删除对应的 Refresh Token。
+        提取族谱，将当前令牌和活跃标记一并抹除。
         """
-        redis_key = f"refresh_token:{refresh_token}"
-        await self.redis.delete(redis_key)
+        val = await self.redis.get(f"refresh_token:{refresh_token}")
+        if val:
+            session_id, _ = val.split(":")
+            await self.redis.delete(f"session_active:{session_id}")
+            
+        await self.redis.delete(f"refresh_token:{refresh_token}")
 
-    async def _create_tokens(self, user_id: str) -> Token:
+    async def _create_tokens(self, user_id: str, session_id: str | None = None) -> Token:
         """
-        [内部方法] 构造 Token 响应并持久化 Refresh Token。
+        [内部方法] 构造 Token 响应并持久化 Refresh Token 及会话族谱。
         """
+        if not session_id:
+            # 首次登录/注册，生成新的会话族谱 ID
+            session_id = str(uuid7())
+
         # 1. 生成 Access Token (JWT)
         access_token = create_access_token(subject=user_id)
 
         # 2. 生成 Refresh Token (高熵随机串)
-        # 使用 urlsafe_token_hex 生成 32 字节 (约 43 字符) 的随机串
+        # 用作当前 session_active 的有效凭证
         refresh_token = secrets.token_urlsafe(32)
+        ttl = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-        # 3. 存入 Redis
-        # Key: refresh_token:xyz... -> Value: user_id
-        # 设置过期时间 (例如 7 天)
+        # 3. 存入 Redis 会话族谱
+        # Key 1: refresh_token:X -> "session_id:user_id"
         await self.redis.setex(
             f"refresh_token:{refresh_token}",
-            timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-            user_id,
+            ttl,
+            f"{session_id}:{user_id}",
+        )
+
+        # Key 2: session_active:SessionID -> "X" (锚定当前树唯一的存活果子)
+        await self.redis.setex(
+            f"session_active:{session_id}",
+            ttl,
+            refresh_token,
         )
 
         return Token(

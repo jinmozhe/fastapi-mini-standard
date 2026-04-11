@@ -12,6 +12,7 @@ Created: 2026-01-15
 """
 
 from starlette.status import (
+    HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
@@ -56,8 +57,14 @@ class AuthError(BaseErrorCode):
     # 账号状态异常
     ACCOUNT_LOCKED = (HTTP_403_FORBIDDEN, "auth.account_locked", "账户已被冻结")
 
-    # 验证码相关
     CAPTCHA_ERROR = (HTTP_403_FORBIDDEN, "auth.captcha_error", "验证码错误或已过期")
+
+    # 令牌盗用/会话家族安全异常
+    TOKEN_THEFT_DETECTED = (
+        HTTP_401_UNAUTHORIZED,
+        "auth.token_theft_detected",
+        "安全警告：检测到异地会话异常或令牌盗用，为保护您的账户，该设备及相关会话已被强制下线，请重新登录。",
+    )
 
 
 # ==============================================================================

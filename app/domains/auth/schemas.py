@@ -15,8 +15,8 @@ Updated: 2026-04-11 (Refactored phone_number to phone_code + mobile)
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-# 引入基础正则与消息
-from app.domains.users.schemas import (
+# 从 core 层导入共享校验常量（避免跨领域导入）
+from app.core.validators import (
     MOBILE_ERROR_MESSAGE,
     MOBILE_PATTERN,
     PHONE_CODE_ERROR_MESSAGE,

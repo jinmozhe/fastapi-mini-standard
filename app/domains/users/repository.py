@@ -4,9 +4,10 @@ Description: 用户领域仓储层 (Repository)
 
 本模块负责用户数据的数据库访问，继承自通用 BaseRepository。
 扩展功能：
-1. get_by_phone_number: 根据手机号查询 (自动过滤软删除)
+1. get_by_mobile: 根据手机区号+手机号查询 (自动过滤软删除)
 2. get_by_email: 根据邮箱查询 (自动过滤软删除)
 3. get_by_username: 根据用户名查询 (自动过滤软删除)
+4. get_multi: 分页查询，支持手机号/用户名模糊搜索
 
 Author: jinmozhe
 Created: 2025-11-25

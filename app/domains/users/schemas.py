@@ -18,23 +18,18 @@ Created: 2025-11-25
 Updated: 2026-04-11 (Refactored phone_number to phone_code and mobile)
 """
 
-import re
 from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-# ------------------------------------------------------------------------------
-# Constants (常量定义)
-# ------------------------------------------------------------------------------
-
-# 手机区号正则：以 + 开头，后接 1-4 位数字
-PHONE_CODE_PATTERN = re.compile(r"^\+\d{1,4}$")
-PHONE_CODE_ERROR_MESSAGE = "手机区号格式错误，应以 + 开头，后跟 1-4 位数字"
-
-# 手机号正则：纯数字，5 到 15 位
-MOBILE_PATTERN = re.compile(r"^\d{5,15}$")
-MOBILE_ERROR_MESSAGE = "手机号格式错误，应为 5-15 位纯数字"
+# 从 core 层导入共享校验常量（避免跨领域导入）
+from app.core.validators import (
+    MOBILE_ERROR_MESSAGE,
+    MOBILE_PATTERN,
+    PHONE_CODE_ERROR_MESSAGE,
+    PHONE_CODE_PATTERN,
+)
 
 
 # ------------------------------------------------------------------------------
@@ -62,8 +57,8 @@ class UserBase(BaseModel):
         default=None, min_length=3, max_length=50, description="用户名 (可选, 唯一)"
     )
     email: EmailStr | None = Field(default=None, description="邮箱 (可选, 唯一)")
-    full_name: str | None = Field(
-        default=None, max_length=100, description="用户全名/昵称"
+    nickname: str | None = Field(
+        default=None, max_length=50, description="用户昵称 (显示用)"
     )
 
     @field_validator("phone_code", mode="before")
@@ -109,7 +104,7 @@ class UserUpdate(BaseModel):
     )
     username: str | None = Field(default=None, min_length=3, max_length=50)
     email: EmailStr | None = Field(default=None)
-    full_name: str | None = Field(default=None, max_length=100)
+    nickname: str | None = Field(default=None, max_length=50, description="用户昵称")
     password: str | None = Field(
         default=None, min_length=6, max_length=128, description="新密码 (如需修改)"
     )

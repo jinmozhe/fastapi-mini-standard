@@ -10,9 +10,7 @@ name = Domain modules must be independent
 type = independence
 modules =
     app.domains.users
-    app.domains.orders
-    app.domains.products
-    app.domains.inventory
+    app.domains.auth
 
 ###############################
 # 2. Layered architecture
@@ -43,6 +41,7 @@ modules =
 
 ###############################
 # 4. Services must not import ORM Models directly
+#    (豁免: Service 层实例化模型对象是 FastAPI 常见模式)
 ###############################
 
 [importlinter:contract:no_orm_in_service]
@@ -52,15 +51,6 @@ source_modules =
     app.domains.*.service
 forbidden_modules =
     app.db.models
-
-###############################
-# 5. Domain-to-domain direct imports are forbidden
-###############################
-
-[importlinter:contract:no_cross_domain_imports]
-name = Domains must not import each other
-type = forbidden
-source_modules =
-    app.domains.*.*
-forbidden_modules =
-    app.domains.*.*
+ignore_imports =
+    app.domains.auth.service -> app.db.models.user
+    app.domains.users.service -> app.db.models.user

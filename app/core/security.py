@@ -90,14 +90,17 @@ async def get_password_hash_async(password: str) -> str:
 
 
 def create_access_token(
-    subject: str | Any, expires_delta: timedelta | None = None
+    subject: str | Any,
+    expires_delta: timedelta | None = None,
+    extra_claims: dict | None = None,
 ) -> str:
     """
     生成 JWT Access Token (短效, 无状态)。
 
     Args:
-        subject: 主体标识 (通常为 user_id)
+        subject: 主体标识 (通常为 user_id 或 admin_id)
         expires_delta: 自定义过期时间差 (可选，默认为配置中的 ACCESS_TOKEN_EXPIRE_MINUTES)
+        extra_claims: 额外注入的 JWT 载荷字段，如 {"aud": "backend"} 用于区分 B/C 端 Token
 
     Returns:
         str: 编码后的 JWT 字符串
@@ -118,11 +121,15 @@ def create_access_token(
     if secret_key is None:
         raise ValueError("SECRET_KEY configuration is missing.")
 
-    # 构造 Payload
-    # sub: Subject (用户ID)
+    # 构造基础 Payload
+    # sub: Subject (用户/管理员ID)
     # exp: Expiration Time (过期时间戳)
     # type: Token 类型 (标识为 access token)
-    to_encode = {"exp": expire, "sub": str(subject), "type": "access"}
+    to_encode: dict[str, Any] = {"exp": expire, "sub": str(subject), "type": "access"}
+
+    # 注入扩展字段（如 B 端专属的 aud='backend' 标识）
+    if extra_claims:
+        to_encode.update(extra_claims)
 
     encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=settings.ALGORITHM)
     return encoded_jwt

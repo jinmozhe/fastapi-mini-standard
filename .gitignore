@@ -1,0 +1,99 @@
+# ==========================================
+# Python & Runtime (编译文件与虚拟环境)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 虚拟环境 (兼容多种常见命名)
+venv/
+.venv/
+env/
+.env/
+
+# 分发与构建
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ==========================================
+# Environment Variables & Secrets (关键安全配置)
+# ==========================================
+# 忽略所有 .env 文件，防止密钥泄露
+.env
+.env.*
+
+# ❗ 必须保留 .env.example 作为配置模板
+!.env.example
+
+# ==========================================
+# Testing & Code Quality (测试产物与缓存)
+# ==========================================
+# ⚠️ 注意：tests/ 源代码目录必须提交，此处仅忽略缓存和报告
+
+# Pytest 缓存
+.pytest_cache/
+
+# Coverage 覆盖率报告
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Mypy 静态类型检查缓存
+.mypy_cache/
+
+# Ruff / Flake8 代码风格检查缓存
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# Pre-commit 钩子缓存
+.pre-commit-cache/
+
+# ==========================================
+# IDE & OS (编辑器配置与系统文件)
+# ==========================================
+# JetBrains (PyCharm)
+.idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# ==========================================
+# Application Specific (应用产生的临时文件)
+# ==========================================
+# Loguru 日志文件
+*.log
+logs/
+
+# 临时测试/调试脚本 (根据你的目录结构)
+test_db_asyncpg.py
+
+# ==========================================
+# Database (Local & Migrations)
+# ==========================================
+# 本地临时数据库 (防止 SQLite 文件污染，尽管你主要用 PG)
+*.sqlite
+*.sqlite3
+*.db
+
+# Alembic 迁移工具
+# ⚠️ 严禁忽略 alembic/versions/ 下的 .py 文件
+# 仅忽略生成的临时 SQL 调试文件
+*.sql
+
+# ==========================================
+# Docker
+# ==========================================
+# 如果本地挂载了 Docker 数据卷
+.docker_volumes/

@@ -1,0 +1,66 @@
+[importlinter]
+root_package = app
+
+###############################
+# 1. Domain independence
+###############################
+
+[importlinter:contract:domains_independent]
+name = Domain modules must be independent
+type = independence
+modules =
+    app.domains.users
+    app.domains.orders
+    app.domains.products
+    app.domains.inventory
+
+###############################
+# 2. Layered architecture
+###############################
+
+[importlinter:contract:layers]
+name = Enforce layered architecture
+type = layers
+layers =
+    app.core
+    app.db.models
+    app.db.repositories
+    app.domains
+    app.services
+    app.api
+ignore_imports =
+    app.domains.* -> fastapi.*
+
+###############################
+# 3. No cycles in domains
+###############################
+
+[importlinter:contract:no_cycles]
+name = No cyclical dependencies in domains
+type = acyclic_siblings
+modules = 
+    app.domains
+
+###############################
+# 4. Services must not import ORM Models directly
+###############################
+
+[importlinter:contract:no_orm_in_service]
+name = Services cannot import ORM models directly
+type = forbidden
+source_modules =
+    app.domains.*.service
+forbidden_modules =
+    app.db.models
+
+###############################
+# 5. Domain-to-domain direct imports are forbidden
+###############################
+
+[importlinter:contract:no_cross_domain_imports]
+name = Domains must not import each other
+type = forbidden
+source_modules =
+    app.domains.*.*
+forbidden_modules =
+    app.domains.*.*

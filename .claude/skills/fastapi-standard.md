@@ -438,6 +438,36 @@ router = APIRouter()
 api_router.include_router(order_router.router, prefix="/orders", tags=["orders"])
 ```
 
+### 规范 #0：领域 Router 的 B/C 端双轨命名约定（强制）
+
+凡需要同时为 C端用户与 B端管理员提供接口的领域，必须在领域的 `router.py` 内定义 **2 个 APIRouter 实例** 并按以下规范命名：
+
+```python
+# app/domains/products/router.py
+from fastapi import APIRouter
+
+# C端（买家）路由器 —— 命名规范：{领域名}_router
+products_router = APIRouter()
+
+# B端（管理员）路由器 —— 命名规范：{领域名}_admin
+products_admin = APIRouter()
+```
+
+```python
+# app/api_router.py 中的聚合规范：
+from app.domains.products.router import products_router, products_admin
+
+api_router.include_router(products_router, prefix="/products",       tags=["C端商品"])
+api_router.include_router(products_admin,  prefix="/admin/products", tags=["B端商品管理"])
+```
+
+| 变量名 | 接口前缀示例 | 访问者 |
+|--------|------------|--------|
+| `{领域}_router` | `/api/v1/{领域}/` | C端用户（买家） |
+| `{领域}_admin` | `/api/v1/admin/{领域}/` | B端管理员（需 `aud=backend` Token） |
+
+> ⚠️ **严禁**全部命名为 `public_router / admin_router`，聚合时多领域必然撞名，被迫写难以维护的 `as` 别名。
+
 ### 违规 #2：OpenAPI 文档裸奔 (影响前端沟通定型)
 ```python
 # ❌ 违规（没用 response_model，前端无法推导返回值）

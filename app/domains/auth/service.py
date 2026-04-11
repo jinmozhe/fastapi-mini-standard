@@ -25,6 +25,7 @@ from app.core.error_code import SystemErrorCode
 from app.core.exceptions import AppException
 from app.core.logging import logger
 from app.core.captcha import verify_captcha_async
+from app.db.models.log import LoginLog
 from app.core.security import (
     create_access_token,
     get_password_hash_async,
@@ -140,17 +141,37 @@ class AuthService:
             return await self._create_tokens(user_id=str(user.id))
             
         except AppException as e:
+            if not reason:
+                reason = "异常拒绝/CAPTCHA拦截"
             raise e
         finally:
-            # 5. 无论成功失败，都记录登录日志
-            # TODO: 待 LoginLog 模型实现后，改为 ORM 持久化
+            # 5. 无论成功失败，都持久化记录双轨登录日志
+            login_log = LoginLog(
+                actor_type="user",
+                actor_id=user_id_for_log if user_id_for_log else None,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                status=status,
+                reason=reason,
+            )
+            self.user_repo.session.add(login_log)
+            # 因为是在终于边界强制插入，需要利用底层机制或者依赖 Session 自己包裹事务的 commit。
+            # FastAPI 依赖里通常是在请求结束时做一层全链路 commit。为了强保成功/失败必须写入，
+            # auth log 我们这通常在中间件独立或者通过抛出异常外层控制，但目前由于我们在 Service 中，
+            # 我们可以直接执行强制落库：
+            try:
+                await self.user_repo.session.commit()
+            except Exception as commit_e:
+                await self.user_repo.session.rollback()
+                logger.error(f"Failed to save login log: {commit_e}")
+
             logger.bind(
                 user_id=user_id_for_log if user_id_for_log else "Unknown",
                 login_ip=ip_address,
                 user_agent=user_agent,
                 status=status,
                 reason=reason,
-            ).info("Login attempt recorded")
+            ).info("Login DB attempt recorded")
 
     async def refresh_token(self, refresh_token: str) -> Token:
         """

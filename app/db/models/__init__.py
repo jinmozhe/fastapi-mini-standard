@@ -28,6 +28,7 @@ from app.db.models.base import (
 # 注意：新增模型必须在此处导入，否则 Alembic 无法识别
 from app.db.models.user import User
 from app.db.models.admin import SysAdmin, SysRole, SysPermission
+from app.db.models.log import LoginLog, AuditLog
 
 # 未来新增模型示例:
 # from app.db.models.user_profile import UserProfile
@@ -47,4 +48,6 @@ __all__ = [
     "SysAdmin",
     "SysRole",
     "SysPermission",
+    "LoginLog",
+    "AuditLog",
 ]

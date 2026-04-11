@@ -74,6 +74,7 @@ class TimestampMixin:
         server_default=func.now(),
         nullable=False,
         comment="创建时间 (UTC)",
+        sort_order=100,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
@@ -83,6 +84,7 @@ class TimestampMixin:
         onupdate=lambda: datetime.now(UTC),
         nullable=False,
         comment="更新时间 (UTC)",
+        sort_order=101,
     )
 
 
@@ -101,10 +103,11 @@ class SoftDeleteMixin:
         server_default=text("false"),
         nullable=False,
         comment="是否软删除",
+        sort_order=102,
     )
 
     deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), default=None, nullable=True, comment="删除时间 (UTC)"
+        DateTime(timezone=True), default=None, nullable=True, comment="删除时间 (UTC)", sort_order=103
     )
 
 
@@ -128,7 +131,7 @@ class UUIDBase(Base):
         return resolve_table_name(cls.__name__)
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid7, comment="主键 (UUID v7)"
+        UUID(as_uuid=True), primary_key=True, default=uuid7, comment="主键 (UUID v7)", sort_order=-100
     )
 
     def update(self, **kwargs: Any) -> None:

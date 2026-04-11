@@ -32,12 +32,12 @@ class UserRepository(BaseRepository[User, BaseModel, UserUpdate]):
     如果业务场景需要查询"已注销"用户，请另行实现类似 get_with_deleted_by_xxx 的方法。
     """
 
-    async def get_by_phone_number(self, phone_number: str) -> User | None:
+    async def get_by_mobile(self, phone_code: str, mobile: str) -> User | None:
         """
-        根据手机号查询有效用户。
+        根据手机区号和手机号查询有效用户。
         """
         stmt = select(User).where(
-            User.phone_number == phone_number, User.is_deleted.is_(False)
+            User.phone_code == phone_code, User.mobile == mobile, User.is_deleted.is_(False)
         )
         # 使用 scalar_one_or_none 以确保数据唯一性 (如果有脏数据导致多条，会抛错)
         result = await self.session.execute(stmt)
@@ -72,7 +72,7 @@ class UserRepository(BaseRepository[User, BaseModel, UserUpdate]):
         if keyword:
             stmt = stmt.where(
                 or_(
-                    User.phone_number.icontains(keyword),
+                    User.mobile.icontains(keyword),
                     User.username.icontains(keyword),
                 )
             )

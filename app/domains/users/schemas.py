@@ -10,11 +10,12 @@ Description: 用户领域 Pydantic 模型 (Schema)
 规范：
 - 严格遵循 Pydantic V2 写法 (ConfigDict)
 - 全面采用 Python 3.11+ 新语法 (X | None)
-- 手机号强制 E.164 格式校验
+- 拆分 phone_code（默认 +86）与 mobile
 - 响应模型开启 from_attributes=True 以支持 ORM 转换
 
 Author: jinmozhe
 Created: 2025-11-25
+Updated: 2026-04-11 (Refactored phone_number to phone_code and mobile)
 """
 
 import re
@@ -27,9 +28,13 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 # Constants (常量定义)
 # ------------------------------------------------------------------------------
 
-# E.164 手机号正则：以 + 开头，后接 8-15 位数字
-E164_PATTERN = re.compile(r"^\+\d{8,15}$")
-E164_ERROR_MESSAGE = "手机号必须符合 E.164 格式 (例如 +8613800000000)"
+# 手机区号正则：以 + 开头，后接 1-4 位数字
+PHONE_CODE_PATTERN = re.compile(r"^\+\d{1,4}$")
+PHONE_CODE_ERROR_MESSAGE = "手机区号格式错误，应以 + 开头，后跟 1-4 位数字"
+
+# 手机号正则：纯数字，5 到 15 位
+MOBILE_PATTERN = re.compile(r"^\d{5,15}$")
+MOBILE_ERROR_MESSAGE = "手机号格式错误，应为 5-15 位纯数字"
 
 
 # ------------------------------------------------------------------------------
@@ -43,10 +48,15 @@ class UserBase(BaseModel):
     包含 Create 和 Read 共有的字段。
     """
 
-    phone_number: str = Field(
+    phone_code: str = Field(
+        default="+86",
+        description="手机区号 (默认 +86)",
+        examples=["+86", "+852"],
+    )
+    mobile: str = Field(
         ...,
-        description="手机号 (核心登录凭证, E.164格式)",
-        examples=["+8613800000000", "+85251234567"],
+        description="手机号码 (纯数字)",
+        examples=["13800000000"],
     )
     username: str | None = Field(
         default=None, min_length=3, max_length=50, description="用户名 (可选, 唯一)"
@@ -56,12 +66,27 @@ class UserBase(BaseModel):
         default=None, max_length=100, description="用户全名/昵称"
     )
 
-    @field_validator("phone_number")
+    @field_validator("phone_code", mode="before")
     @classmethod
-    def validate_e164(cls, v: str) -> str:
-        """验证手机号是否符合 E.164 格式"""
-        if not E164_PATTERN.match(v):
-            raise ValueError(E164_ERROR_MESSAGE)
+    def default_phone_code(cls, v: str | None) -> str:
+        if not v:
+            return "+86"
+        return v
+
+    @field_validator("phone_code")
+    @classmethod
+    def validate_phone_code(cls, v: str) -> str:
+        """验证手机区号格式"""
+        if not PHONE_CODE_PATTERN.match(v):
+            raise ValueError(PHONE_CODE_ERROR_MESSAGE)
+        return v
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        """验证手机号格式"""
+        if not MOBILE_PATTERN.match(v):
+            raise ValueError(MOBILE_ERROR_MESSAGE)
         return v
 
 
@@ -76,8 +101,11 @@ class UserUpdate(BaseModel):
     所有字段均为可选，仅更新传入的字段 (PATCH 语义)。
     """
 
-    phone_number: str | None = Field(
-        default=None, description="新手机号 (E.164 格式，如 +8613800000000)"
+    phone_code: str | None = Field(
+        default=None, description="新手机区号 (如 +86)"
+    )
+    mobile: str | None = Field(
+        default=None, description="新手机号 (纯数字)"
     )
     username: str | None = Field(default=None, min_length=3, max_length=50)
     email: EmailStr | None = Field(default=None)
@@ -87,13 +115,29 @@ class UserUpdate(BaseModel):
     )
     is_active: bool | None = Field(default=None, description="是否激活 (仅管理员可改)")
 
-    @field_validator("phone_number")
+    @field_validator("phone_code", mode="before")
     @classmethod
-    def validate_e164(cls, v: str | None) -> str | None:
+    def default_phone_code(cls, v: str | None) -> str | None:
+        if v == "":
+            return "+86"
+        return v
+
+    @field_validator("phone_code")
+    @classmethod
+    def validate_phone_code(cls, v: str | None) -> str | None:
         if v is None:
             return None
-        if not E164_PATTERN.match(v):
-            raise ValueError(E164_ERROR_MESSAGE)
+        if not PHONE_CODE_PATTERN.match(v):
+            raise ValueError(PHONE_CODE_ERROR_MESSAGE)
+        return v
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        if not MOBILE_PATTERN.match(v):
+            raise ValueError(MOBILE_ERROR_MESSAGE)
         return v
 
 

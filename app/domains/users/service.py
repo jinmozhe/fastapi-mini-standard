@@ -70,13 +70,16 @@ class UserService:
             user.hashed_password = hashed_password
 
         # 2. 处理唯一性字段变更 (防止冲突)
-        if (
-            "phone_number" in update_data
-            and update_data["phone_number"] != user.phone_number
-        ):
-            existing = await self.repo.get_by_phone_number(update_data["phone_number"])
-            if existing and existing.id != user.id:
-                raise AppException(UserError.PHONE_EXIST)
+        has_mobile_change = "phone_code" in update_data or "mobile" in update_data
+        
+        if has_mobile_change:
+            new_code = update_data.get("phone_code", user.phone_code)
+            new_mobile = update_data.get("mobile", user.mobile)
+            
+            if new_code != user.phone_code or new_mobile != user.mobile:
+                existing = await self.repo.get_by_mobile(new_code, new_mobile)
+                if existing and existing.id != user.id:
+                    raise AppException(UserError.PHONE_EXIST)
 
         if "email" in update_data and update_data["email"] != user.email:
             if update_data["email"] is not None:

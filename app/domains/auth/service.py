@@ -53,7 +53,7 @@ class AuthService:
         4. 生成双 Token (自动登录)
         """
         # 1. 唯一性校验
-        if await self.user_repo.get_by_phone_number(reg_data.phone_number):
+        if await self.user_repo.get_by_mobile(reg_data.phone_code, reg_data.mobile):
             raise AppException(AuthError.PHONE_EXIST)
 
         if reg_data.email and await self.user_repo.get_by_email(reg_data.email):
@@ -69,7 +69,8 @@ class AuthService:
 
         # 3. 创建用户
         user = User(
-            phone_number=reg_data.phone_number,
+            phone_code=reg_data.phone_code,
+            mobile=reg_data.mobile,
             hashed_password=hashed_password,
             username=reg_data.username,
             email=reg_data.email,
@@ -81,7 +82,7 @@ class AuthService:
         await self.user_repo.session.commit()
         await self.user_repo.session.refresh(user)
 
-        logger.bind(user_id=str(user.id), phone_number=user.phone_number).info(
+        logger.bind(user_id=str(user.id), phone_code=user.phone_code, mobile=user.mobile).info(
             "User registered successfully"
         )
 
@@ -108,7 +109,7 @@ class AuthService:
         
         try:
             # 1. 查询用户
-            user = await self.user_repo.get_by_phone_number(login_data.phone_number)
+            user = await self.user_repo.get_by_mobile(login_data.phone_code, login_data.mobile)
             if not user:
                 reason = "账号或密码错误"
                 raise AppException(AuthError.INVALID_CREDENTIALS)

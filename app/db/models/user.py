@@ -16,7 +16,7 @@ Author: jinmozhe
 Created: 2025-11-25
 """
 
-from sqlalchemy import Boolean, String, text
+from sqlalchemy import Boolean, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
 from app.db.models.base import SoftDeleteMixin, UUIDModel
@@ -31,16 +31,28 @@ class User(UUIDModel, SoftDeleteMixin):
     def __tablename__(cls) -> str:
         return "users"
 
+    @declared_attr.directive
+    def __table_args__(cls) -> tuple:
+        return (
+            UniqueConstraint("phone_code", "mobile", name="uq_user_phone_mobile"),
+        )
+
     # --------------------------------------------------------------------------
     # 核心凭证
     # --------------------------------------------------------------------------
 
-    # 手机号：核心登录凭证，必填且唯一
-    phone_number: Mapped[str] = mapped_column(
-        String(20),
-        unique=True,
+    # 手机区号：默认 +86，仅存储前缀
+    phone_code: Mapped[str] = mapped_column(
+        String(10),
         nullable=False,
-        comment="手机号 (核心登录凭证, E.164格式)",
+        comment="手机区号 (如 +86)",
+    )
+
+    # 手机号：核心登录凭证，本地号码纯数字
+    mobile: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        comment="手机号 (仅号码部分)",
     )
 
     # 邮箱：辅助登录凭证，可为空

@@ -1,60 +1,31 @@
 # 关注点与技术债务 (CONCERNS)
 
-## 🔴 高优先级问题
+## ~~🔴 高优先级问题~~ (已全部修复 ✅)
 
-### 1. 不存在的模型文件被引用
+### ~~1. 不存在的模型文件被引用~~ ✅ 已修复
 
 **文件**: `app/db/models/__init__.py`
 
-```python
-from app.db.models.user_profile import UserProfile   # ❌ 文件不存在
-from app.db.models.user_social import UserSocial       # ❌ 文件不存在
-from app.db.models.log import LoginLog, OperationLog   # ❌ 文件不存在
-```
+已将 `UserProfile`, `UserSocial`, `LoginLog`, `OperationLog` 的导入注释为未来扩展占位。
+`auth/service.py` 中的 `LoginLog` ORM 写入改为 Loguru 结构化日志。
 
-`__init__.py` 导入了 3 个不存在的模型模块 (`user_profile.py`, `user_social.py`, `log.py`)。这会导致 **应用启动时 ImportError 崩溃**。
-
-**影响**: 应用无法启动；Alembic 迁移无法执行。
-**修复**: 要么创建缺失的模型文件, 要么移除未实现的导入。
-
-### 2. 不存在的 Admin 领域被引用
+### ~~2. 不存在的 Admin 领域被引用~~ ✅ 已修复
 
 **文件**: `app/api_router.py`
 
-```python
-from app.domains.admin.router import router as admin_router  # ❌ 目录不存在
-```
+已将 admin 路由导入和注册注释为未来扩展占位。
 
-`api_router.py` 引用了 `app.domains.admin`, 但 `app/domains/` 下只有 `auth/` 和 `users/`。同样会导致 **ImportError**。
-
-**影响**: 应用无法启动。
-**修复**: 创建 admin 领域或移除该路由注册。
-
-### 3. 不存在的 AuditLogMiddleware 被引用
+### ~~3. 不存在的 AuditLogMiddleware 被引用~~ ✅ 已修复
 
 **文件**: `app/core/middleware.py`
 
-```python
-from app.core.audit import AuditLogMiddleware  # ❌ 文件不存在
-```
+已将 `AuditLogMiddleware` 导入和注册注释为待实现后启用。
 
-中间件模块导入了不存在的 `app/core/audit.py`。会导致 **ImportError**。
-
-**影响**: 应用无法启动。
-**修复**: 创建该模块或移除导入。
-
-### 4. Repository 引用不存在的 Schema
+### ~~4. Repository 引用不存在的 Schema~~ ✅ 已修复
 
 **文件**: `app/domains/users/repository.py`
 
-```python
-from app.domains.users.schemas import UserCreate, UserUpdate
-```
-
-`UserCreate` 类在 `app/domains/users/schemas.py` 中**不存在** (已被移到 `auth/schemas.py` 的 `RegisterRequest`)。会导致 **ImportError**。
-
-**影响**: 用户领域功能无法正常工作。
-**修复**: 移除 `UserCreate` 导入或创建该 Schema 类。
+已移除不存在的 `UserCreate` 导入，泛型 `CreateSchemaType` 改用 `BaseModel` 占位。
 
 ## 🟡 中优先级问题
 

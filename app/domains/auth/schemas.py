@@ -10,13 +10,18 @@ Description: 认证领域 Pydantic 模型 (Schema)
 
 Author: jinmozhe
 Created: 2025-12-05
-Updated: 2026-04-03 (新增 RegisterRequest)
+Updated: 2026-04-11 (Refactored phone_number to phone_code + mobile)
 """
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-# 复用 User 领域的正则常量，保持全站规则一致
-from app.domains.users.schemas import E164_ERROR_MESSAGE, E164_PATTERN
+# 引入基础正则与消息
+from app.domains.users.schemas import (
+    MOBILE_ERROR_MESSAGE,
+    MOBILE_PATTERN,
+    PHONE_CODE_ERROR_MESSAGE,
+    PHONE_CODE_PATTERN,
+)
 
 
 class Token(BaseModel):
@@ -35,19 +40,37 @@ class LoginRequest(BaseModel):
     手机号密码登录请求参数。
     """
 
-    phone_number: str = Field(
+    phone_code: str = Field(
+        default="+86",
+        description="手机区号 (默认 +86)",
+        examples=["+86"],
+    )
+    mobile: str = Field(
         ...,
-        description="手机号 (E.164 格式)",
-        examples=["+8613800000000"],
+        description="手机号码 (纯数字)",
+        examples=["13800000000"],
     )
     password: str = Field(..., min_length=6, description="用户密码")
 
-    @field_validator("phone_number")
+    @field_validator("phone_code", mode="before")
     @classmethod
-    def validate_e164(cls, v: str) -> str:
-        """验证手机号格式"""
-        if not E164_PATTERN.match(v):
-            raise ValueError(E164_ERROR_MESSAGE)
+    def default_phone_code(cls, v: str | None) -> str:
+        if not v:
+            return "+86"
+        return v
+
+    @field_validator("phone_code")
+    @classmethod
+    def validate_phone_code(cls, v: str) -> str:
+        if not PHONE_CODE_PATTERN.match(v):
+            raise ValueError(PHONE_CODE_ERROR_MESSAGE)
+        return v
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        if not MOBILE_PATTERN.match(v):
+            raise ValueError(MOBILE_ERROR_MESSAGE)
         return v
 
 
@@ -56,10 +79,15 @@ class RegisterRequest(BaseModel):
     用户注册请求参数。
     """
 
-    phone_number: str = Field(
+    phone_code: str = Field(
+        default="+86",
+        description="手机区号 (默认 +86)",
+        examples=["+86"],
+    )
+    mobile: str = Field(
         ...,
-        description="手机号 (E.164 格式)",
-        examples=["+8613800000000"],
+        description="手机号码 (纯数字)",
+        examples=["13800000000"],
     )
     password: str = Field(..., min_length=6, max_length=128, description="用户密码")
     username: str | None = Field(
@@ -67,12 +95,25 @@ class RegisterRequest(BaseModel):
     )
     email: EmailStr | None = Field(default=None, description="邮箱 (可选，唯一)")
 
-    @field_validator("phone_number")
+    @field_validator("phone_code", mode="before")
     @classmethod
-    def validate_e164(cls, v: str) -> str:
-        """验证手机号格式"""
-        if not E164_PATTERN.match(v):
-            raise ValueError(E164_ERROR_MESSAGE)
+    def default_phone_code(cls, v: str | None) -> str:
+        if not v:
+            return "+86"
+        return v
+
+    @field_validator("phone_code")
+    @classmethod
+    def validate_phone_code(cls, v: str) -> str:
+        if not PHONE_CODE_PATTERN.match(v):
+            raise ValueError(PHONE_CODE_ERROR_MESSAGE)
+        return v
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        if not MOBILE_PATTERN.match(v):
+            raise ValueError(MOBILE_ERROR_MESSAGE)
         return v
 
 

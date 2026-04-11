@@ -396,6 +396,10 @@ Created: 2026-01-15
 - [ ] 金额字段是否使用了 `DECIMAL`（严禁 Float）？
 - [ ] 是否使用了 `Mapped` 和 `mapped_column`？
 
+#### D. 自动化数据库迁移 (Alembic) 触发规范
+- [ ] **强制执行**：但凡在任务中修改了 `app/db/models` 内的模型（增删改字段/表），代码写完后，必须在终端内自动且强制执行 `conda activate fastapi_env ; alembic revision --autogenerate -m "..."` 及 upgrade 操作。不需经过用户询问即可直接跑。
+- [ ] **遇错降级安全墙**：如果在后台自动执行 Alembic 时遭遇 "Can't locate revision identified by..." 等历史错位或关联错误，**严禁使用 SQL 自主删库跑路或清空表**，必须停止并在最终给用户的反馈中注明。只有当用户明确指示“安全/授权清空重建”或调起专属 Workflow 后才允许执行破坏性恢复！
+
 #### D. 响应与异常
 - [ ] API 是否返回统一 Envelope（`ResponseModel[T]`）？
 - [ ] **数据转 Dict 是否使用了 `model_dump(mode='json')`**，防止 ORJSON UUID 序列化崩溃？

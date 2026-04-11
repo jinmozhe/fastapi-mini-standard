@@ -118,15 +118,3 @@ async def get_current_user(
 # 用法: async def endpoint(user: CurrentUser): ...
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
-
-async def get_current_superuser(current_user: CurrentUser) -> User:
-    """
-    超级管理员权限校验。
-    """
-    if not current_user.is_superuser:
-        raise AppException(SystemErrorCode.FORBIDDEN, message="Not enough privileges")
-    return current_user
-
-
-# 超级管理员依赖
-SuperUser = Annotated[User, Depends(get_current_superuser)]

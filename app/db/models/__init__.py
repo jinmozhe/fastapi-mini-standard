@@ -27,6 +27,7 @@ from app.db.models.base import (
 # 2. 导入业务模型
 # 注意：新增模型必须在此处导入，否则 Alembic 无法识别
 from app.db.models.user import User
+from app.db.models.admin import SysAdmin, SysRole, SysPermission
 
 # 未来新增模型示例:
 # from app.db.models.user_profile import UserProfile
@@ -43,4 +44,7 @@ __all__ = [
     "SoftDeleteMixin",
     # 业务模型
     "User",
+    "SysAdmin",
+    "SysRole",
+    "SysPermission",
 ]

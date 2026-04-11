@@ -97,14 +97,6 @@ class User(UUIDModel, SoftDeleteMixin):
         comment="是否激活",
     )
 
-    # 超级管理员标记
-    is_superuser: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        server_default=text("false"),
-        nullable=False,
-        comment="是否超级管理员",
-    )
 
     # 实名认证状态 (冗余字段，便于快速判断权限)
     is_verified: Mapped[bool] = mapped_column(

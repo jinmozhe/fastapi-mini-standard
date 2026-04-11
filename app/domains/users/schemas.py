@@ -149,7 +149,6 @@ class UserRead(UserBase):
 
     id: UUID = Field(..., description="用户 ID (UUID v7)")
     is_active: bool = Field(..., description="账号状态")
-    is_superuser: bool = Field(..., description="是否超级管理员")
     created_at: datetime = Field(..., description="创建时间 (UTC)")
     updated_at: datetime = Field(..., description="更新时间 (UTC)")
 

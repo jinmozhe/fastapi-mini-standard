@@ -156,20 +156,27 @@ class AuthService:
         4. 签发全新的一对 Access + Refresh Token
         """
         redis_key = f"refresh_token:{refresh_token}"
-        user_id = await self.redis.get(redis_key)
+        # 使用原生原子操作 getdel，获取并立刻销毁，从物理层面防止并发重放
+        user_id = await self.redis.getdel(redis_key)
 
         if not user_id:
             # Token 无效属于系统级认证失败，使用 SystemErrorCode.UNAUTHORIZED (HTTP 401)
-            # 这里选择覆盖默认 message，提供更具体的上下文
             raise AppException(
                 SystemErrorCode.UNAUTHORIZED, message="Refresh token 无效或已过期"
             )
 
-        # 可选：此处可加一步查库，确保用户未被封号/软删除
-        # user = await self.user_repo.get(user_id) ...
-
-        # 销毁旧 Token (一次性使用策略)
-        await self.redis.delete(redis_key)
+        # 强制查库校验：确保被软删除或封禁的用户无法继续续签无限获取 Access Token
+        user = await self.user_repo.get(user_id)
+        
+        if not user or user.is_deleted:
+            raise AppException(
+                SystemErrorCode.UNAUTHORIZED, message="用户不存在或已被注销"
+            )
+            
+        if not user.is_active:
+            raise AppException(
+                SystemErrorCode.UNAUTHORIZED, message="用户已被禁用/封禁"
+            )
 
         # 签发新 Token
         return await self._create_tokens(user_id=user_id)

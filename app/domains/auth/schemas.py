@@ -50,7 +50,7 @@ class LoginRequest(BaseModel):
         description="手机号码 (纯数字)",
         examples=["13800000000"],
     )
-    password: str = Field(..., min_length=6, description="用户密码")
+    password: str = Field(..., min_length=6, max_length=128, description="用户密码")
 
     @field_validator("phone_code", mode="before")
     @classmethod

@@ -86,6 +86,8 @@ scripts/                 # 运维脚本
 | **Runtime 驱动** | `postgresql+asyncpg` | 全链路异步，无阻塞 I/O |
 | **迁移驱动** | `postgresql+psycopg`（Psycopg 3）| Alembic 必须使用同步驱动，禁止 psycopg2 |
 | **主键 & 链路 ID** | UUID v7 (RFC 9562) | 全栈统一，必须作为 `request_id` 贯穿日志 |
+| **API 限流防刷** | Redis INCR + 限流组件 | 对外敏感接口强挂 `Depends(RateLimiter)` 拦截算力耗损 |
+| **外部云网关通讯**| 原生 `httpx` 网络请求 | 严禁引入带冲突风险的庞大云厂商验证SDK，使用轻量请求适配 |
 | **JSON 响应** | ORJSONResponse + ResponseModel Envelope | 性能 + 强制统一接口契约 |
 | **数值** | 严禁 Float；金额 DECIMAL(15,2)；比率 DECIMAL(15,4) | 精度保证，规避浮点精度陷阱 |
 | **时间** | DateTime(timezone=True) + server_default=text("now()") | 数据库生成，规避时区混乱 |
@@ -405,11 +407,16 @@ Created: 2026-01-15
 - [ ] **数据转 Dict 是否使用了 `model_dump(mode='json')`**，防止 ORJSON UUID 序列化崩溃？
 - [ ] 业务错误是否抛出 `AppException`（严禁 Service 层抛 `HTTPException`）？
 
-#### E. 日志与安全
+#### E. 日志与通用安全
 - [ ] 是否从 `app/core/logging.py` 导入 logger（禁止 `print()`）？
 - [ ] 是否配置了 `InterceptHandler` 接管 Uvicorn/标准库日志？
 - [ ] PII（手机号/邮箱/身份证）是否已通过 `app/utils/masking.py` 脱敏？
 - [ ] Access Log 是否未记录 Request Body / 完整 Query String / Authorization Header？
+
+#### F. 高可用安全与架构防御底线 (Security)
+- [ ] **密码防脱裤限制**：高危入口（如 `/login`，涉及 Argon2 计算）必须挂载 `Depends(RateLimiter)`，防止 CPU 被爆破耗尽。
+- [ ] **图文验证架构防呆**：若引入防刷行为验证等外部云依赖，必须通过 `CAPTCHA_ENABLE` 等开关提供开发旁路逃生舱，严禁直接硬编码堵死本地环境。
+- [ ] **刷新与盗用追踪 (Token Family)**：对长效 Token（如 Refresh Token）的状态重置必须使用原子操作（如 Redis `RENAME`），并挂载原会话族谱监控连坐销毁逻辑！
 
 ---
 

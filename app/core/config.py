@@ -96,6 +96,17 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
 
     # --------------------------------------------------------------------------
+    # 6. CAPTCHA Settings (验证码防刷与人机验证)
+    # --------------------------------------------------------------------------
+    # 安全逃生舱：在开发测试环境或出问题时，可随时设为 False 绕过所有验证码校验
+    CAPTCHA_ENABLE: bool = False
+    # 支持的提供商：当前默认实现腾讯云骨架适配
+    CAPTCHA_PROVIDER: Literal["tencent", "aliyun"] = "tencent"
+    CAPTCHA_SECRET_ID: str = ""
+    CAPTCHA_SECRET_KEY: str = ""
+    CAPTCHA_APP_ID: str = ""
+
+    # --------------------------------------------------------------------------
     # Properties (便捷属性)
     # --------------------------------------------------------------------------
     @property

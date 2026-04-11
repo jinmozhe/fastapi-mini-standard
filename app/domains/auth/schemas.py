@@ -51,6 +51,8 @@ class LoginRequest(BaseModel):
         examples=["13800000000"],
     )
     password: str = Field(..., min_length=6, max_length=128, description="用户密码")
+    captcha_ticket: str = Field(default="", description="验证码凭证/票据 (开启防刷时必传)")
+    captcha_randstr: str = Field(default="", description="验证码随机串 (腾讯云接口需配合传入)")
 
     @field_validator("phone_code", mode="before")
     @classmethod

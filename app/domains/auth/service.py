@@ -24,6 +24,7 @@ from app.core.config import settings
 from app.core.error_code import SystemErrorCode
 from app.core.exceptions import AppException
 from app.core.logging import logger
+from app.core.captcha import verify_captcha_async
 from app.core.security import (
     create_access_token,
     get_password_hash_async,
@@ -110,6 +111,10 @@ class AuthService:
         reason = ""
         
         try:
+            # 0. 行为安全验证码防刷校验
+            client_ip = ip_address or "127.0.0.1"
+            await verify_captcha_async(login_data.captcha_ticket, login_data.captcha_randstr, client_ip)
+
             # 1. 查询用户
             user = await self.user_repo.get_by_mobile(login_data.phone_code, login_data.mobile)
             if not user:

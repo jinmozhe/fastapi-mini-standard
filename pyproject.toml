@@ -16,22 +16,23 @@ authors = [
 
 # 核心运行时依赖 (严格对齐 2025 年末稳定版本基线)
 dependencies = [
-    "fastapi>=0.121.0",          # Web 框架 (0.121+ 稳定基线)
+    "fastapi>=0.121.0", # Web 框架 (0.121+ 稳定基线)
     "uvicorn[standard]>=0.38.0", # ASGI 服务器
     "sqlalchemy[asyncio]>=2.0.44", # ORM (Typed) + Asyncio 扩展 (greenlet)
-    "asyncpg>=0.30.0",           # PostgreSQL 异步驱动
-    "pydantic>=2.12.0",          # 数据验证 v2
+    "asyncpg>=0.30.0", # PostgreSQL 异步驱动
+    "pydantic>=2.12.0", # 数据验证 v2
     "pydantic-settings>=2.12.0", # 配置管理
-    "email-validator>=2.1.0",    # Pydantic EmailStr 校验
-    "orjson>=3.10.0",            # 高性能 JSON 序列化 (强制默认)
-    "loguru>=0.7.2",             # 集中式日志
-    "uuid6>=2024.1.12",          # UUID v7 生成库
-    "alembic>=1.17.0",           # 数据库迁移
-    "psycopg[binary]>=3.1.0",    # Alembic 同步迁移驱动 (Psycopg 3)
-    "python-multipart>=0.0.12",  # Form data 支持
-    "pwdlib[argon2]>=0.2.0",     # 密码哈希 (Argon2id, 代码实际使用 pwdlib)
-    "PyJWT[crypto]>=2.8.0",       # JWT 签发与验签 (活跃维护, 替代 python-jose)
-    "redis>=5.0.0",              # Redis 异步客户端 (Refresh Token 存储)
+    "email-validator>=2.1.0", # Pydantic EmailStr 校验
+    "orjson>=3.10.0", # 高性能 JSON 序列化 (强制默认)
+    "loguru>=0.7.2", # 集中式日志
+    "uuid6>=2024.1.12", # UUID v7 生成库
+    "alembic>=1.17.0", # 数据库迁移
+    "psycopg[binary]>=3.1.0", # Alembic 同步迁移驱动 (Psycopg 3)
+    "python-multipart>=0.0.12", # Form data 支持
+    "pwdlib[argon2]>=0.2.0", # 密码哈希 (Argon2id, 代码实际使用 pwdlib)
+    "PyJWT[crypto]>=2.8.0", # JWT 签发与验签 (活跃维护, 替代 python-jose)
+    "redis>=5.0.0", # Redis 异步客户端 (Refresh Token 存储)
+    "httpx>=0.28.1",
 ]
 
 # 开发与测试依赖

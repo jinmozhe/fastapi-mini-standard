@@ -25,6 +25,7 @@ from redis.asyncio import Redis
 
 from app.api.deps import DBSession
 from app.core.redis import get_redis
+from app.core.rate_limit import RateLimiter
 
 # [变更] 仅导入 ResponseModel，移除 success 辅助函数
 from app.core.response import ResponseModel
@@ -87,12 +88,12 @@ async def register(
         data=token, message=AuthMsg.REGISTER_SUCCESS, request_id=req_id
     )
 
-
 @router.post(
     "/login",
     response_model=ResponseModel[Token],
     summary="用户登录",
     description="使用手机号密码登录，成功后返回 Access Token (JWT) 和 Refresh Token。",
+    dependencies=[Depends(RateLimiter(times=5, seconds=60))]
 )
 async def login(
     request: Request,

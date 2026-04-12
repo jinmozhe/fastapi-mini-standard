@@ -419,6 +419,9 @@ Created: 2026-01-15
 - [ ] **刷新与盗用追踪 (Token Family)**：对长效 Token（如 Refresh Token）的状态重置必须使用原子操作（如 Redis `RENAME`），并挂载原会话族谱监控连坐销毁逻辑！
 - [ ] **B/C 端物理隔离纪律**：严禁将 B 端管理员（客服、审核人员）属性写在 C 端买家表（`users`）中。凡涉及内部权限，必须强制独立走 `SysAdmin` 的 5 表 RBAC 领域机制！
 - [ ] **异常与网关审计双核录入**：所有登录边界拦截必须存入持久化数据库（`LoginLog`），核心内部管理员动作强要求开启防内鬼记录，且动作参数必须原封用 JSONB （`AuditLog`）留存底案。
+- [ ] **JWT 双端 `aud` 隔离**：B 端 Token 必须在 Payload 中注入 `aud: "backend"`，C 端 Token 注入 `aud: "frontend"`。`deps.py` 中的 `get_current_user` 和 `get_current_admin` 必须分别校验 `aud` 字段，拒绝跨端访问。
+- [ ] **AuditLogMiddleware 全量拦截规范**：`AuditLogMiddleware` 必须拦截 `/admin/` 路径下的所有请求（含 GET），采用旁路独立 Session 提交，写入失败不得阻塞主请求（Fail-Open）。请求体中的 password/token 等敏感字段必须自动脱敏为 `***` 后再落库。
+- [ ] **超级管理员种子脚本 (`seed_admin.py`)**：每个项目必须在 `scripts/seed_admin.py` 中提供幂等的超级管理员初始化脚本。该脚本需创建基础权限树、SUPER_ADMIN 角色并完成绑定。支持通过环境变量 `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD` 自定义账密。
 
 ---
 

@@ -78,6 +78,12 @@ INITIAL_PERMISSIONS: list[tuple[str, str, str]] = [
     ("order:refund",    "订单退款",     "button"),
     ("finance:view",    "财务报表",     "menu"),
     ("finance:export",  "财务数据导出", "button"),
+    # 会员等级管理权限
+    ("user_level:view",     "会员等级查看",     "menu"),
+    ("user_level:create",   "新增会员等级",     "button"),
+    ("user_level:edit",     "编辑会员等级",     "button"),
+    ("user_level:delete",   "删除会员等级",     "button"),
+    ("user_level:override", "强制指定用户等级", "button"),
 ]
 
 SUPER_ADMIN_ROLE_CODE: str = "SUPER_ADMIN"

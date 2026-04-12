@@ -29,6 +29,7 @@ from app.db.models.base import (
 from app.db.models.user import User
 from app.db.models.admin import SysAdmin, SysRole, SysPermission
 from app.db.models.log import LoginLog, AuditLog
+from app.db.models.user_level import UserLevel, UserLevelProfile, UserLevelRecord
 
 # 未来新增模型示例:
 # from app.db.models.user_profile import UserProfile
@@ -50,4 +51,8 @@ __all__ = [
     "SysPermission",
     "LoginLog",
     "AuditLog",
+    # 用户等级体系
+    "UserLevel",
+    "UserLevelProfile",
+    "UserLevelRecord",
 ]

@@ -17,6 +17,8 @@ from fastapi import APIRouter
 from app.domains.auth.router import router as auth_router
 from app.domains.users.router import router as users_router
 from app.domains.admin.router import router as admin_router
+from app.domains.user_levels.router import router as user_levels_router
+from app.domains.user_levels.admin_router import router as user_levels_admin
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -33,10 +35,15 @@ api_router.include_router(auth_router, prefix="/auth", tags=["C端认证"])
 # 包含用户注册、查询、更新等接口
 api_router.include_router(users_router, prefix="/users", tags=["C端用户"])
 
-# 3. B端管理员模块 (Admin Domain)
+# 3. C端会员等级模块 (User Levels Domain - C端展示)
+# C端用户查看等级体系、权益对比
+api_router.include_router(user_levels_router, prefix="/user_levels", tags=["C端会员等级"])
+
+# 4. B端管理员模块 (Admin Domain)
 # 包含管理员登录/刷新/登出、以及向前端输出角色权限树的接口
 api_router.include_router(admin_router, prefix="/admin", tags=["B端管理员"])
 
-# 未来新增模块示例:
-# from app.domains.orders.router import router as orders_router
-# api_router.include_router(orders_router, prefix="/orders", tags=["订单"])
+# 5. B端会员等级管理模块 (User Levels Domain - B端管理)
+# 后台管理员维护等级配置、人工干预用户等级
+api_router.include_router(user_levels_admin, prefix="/admin/user_levels", tags=["B端会员等级管理"])
+

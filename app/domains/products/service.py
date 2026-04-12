@@ -35,6 +35,7 @@ from app.domains.products.repository import (
     ProductRepository,
     ProductSkuRepository,
     ProductSpecRepository,
+    ProductViewRepository,
 )
 
 
@@ -48,6 +49,7 @@ class ProductService:
         self.sku_repo = ProductSkuRepository(db)
         self.level_price_repo = ProductLevelPriceRepository(db)
         self.level_commission_repo = ProductLevelCommissionRepository(db)
+        self.view_repo = ProductViewRepository(db)
 
     # ==========================================================================
     # 分类管理
@@ -389,6 +391,42 @@ class ProductService:
         if found_category_rule:
             return best_first, best_second, best_other
 
-        # 优先级 3：等级通用分佣规则 → 由 OrderService 在调用端处理
         # 这里返回全零表示"本商品无独立分佣，请回退等级通用规则"
         return Decimal("0"), Decimal("0"), Decimal("0")
+
+    # ==========================================================================
+    # 商品浏览足迹引擎
+    # ==========================================================================
+
+    async def record_user_view(self, user_id: UUID, product_id: UUID) -> None:
+        """静默记录会员浏览足迹，并自动清理超额记录"""
+        # 确认商品存在且未被删除
+        product = await self.product_repo.get_by_id(product_id)
+        if not product or product.is_deleted:
+            return # 静默失败，不打扰主流程
+
+        # 1. 触发 UPSERT 刷新浏览时间
+        await self.view_repo.upsert_view(user_id, product_id)
+
+        # 2. 触发清道夫自动删减至 50 条上限
+        await self.view_repo.trim_old_views(user_id, keep_limit=50)
+
+        # 提交异步写入
+        await self.db.commit()
+
+    async def get_my_views(self, user_id: UUID, skip: int = 0, limit: int = 20) -> list[dict]:
+        """获取我的浏览记录，并拉去商品基础信息"""
+        views = await self.view_repo.get_my_views(user_id, skip, limit)
+        
+        result_items = []
+        for v in views:
+            # 加载具体商品
+            product = await self.product_repo.get_by_id(v.product_id)
+            if product and not product.is_deleted:
+                # 只返回目前依然存在有效的商品留痕
+                result_items.append({
+                    "viewed_at": v.updated_at,
+                    "product": product
+                })
+                
+        return result_items

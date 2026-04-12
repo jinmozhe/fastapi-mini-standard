@@ -12,6 +12,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.domains.products.constants import ProductType
+
 from app.domains.products.constants import ProductStatus, ProductType
 
 
@@ -254,3 +256,14 @@ class BatchSetSpecsReq(BaseModel):
 class BatchSetSkusReq(BaseModel):
     """批量设置 SKU"""
     skus: list[ProductSkuCreate] = Field(..., description="SKU 列表")
+
+
+# ==============================================================================
+# 商品浏览足迹表现层 (Product Views)
+# ==============================================================================
+
+class ProductViewItem(BaseModel):
+    """商品足迹响应项"""
+    viewed_at: datetime = Field(..., description="最近一次浏览的具体时钟")
+    product: ProductRead = Field(..., description="浏览的商品外壳包裹")
+

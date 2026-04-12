@@ -12,7 +12,7 @@ Created: 2026-04-12
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query, Request, BackgroundTasks
 
 from app.api.deps import CurrentAdmin, CurrentUser
 from app.core.response import ResponseModel
@@ -32,6 +32,7 @@ from app.domains.products.schemas import (
     ProductRead,
     ProductStatusUpdate,
     ProductUpdate,
+    ProductViewItem,
 )
 
 # C 端路由器
@@ -123,6 +124,57 @@ async def get_product_detail(
         "specs": detail["specs"],
         "skus": detail["skus"],
     })
+
+
+@product_router.post(
+    "/{product_id}/view",
+    response_model=ResponseModel,
+    summary="（前端上报）静默记录足迹",
+)
+async def record_my_view(
+    request: Request,
+    product_id: UUID,
+    user: CurrentUser,
+    service: ProductServiceDep,
+    background_tasks: BackgroundTasks,
+) -> ResponseModel[Any]:
+    """
+    当页面渲染完毕且用户停留特定时间后，向此处发送上报以留下真实足迹。
+    全异步无阻塞处理。
+    """
+    background_tasks.add_task(service.record_user_view, user.id, product_id)
+    return ResponseModel.success()
+
+
+@product_router.get(
+    "/my-views/list",
+    response_model=ResponseModel[list[ProductViewItem]],
+    summary="我的浏览足迹",
+)
+async def get_my_views(
+    request: Request,
+    user: CurrentUser,
+    service: ProductServiceDep,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> ResponseModel[Any]:
+    """
+    返回当前登录用户的防重历史足迹时间线。
+    """
+    items = await service.get_my_views(user.id, skip, limit)
+    
+    # 将字典结构转换为带有验证的对应模型结构
+    result = []
+    for item in items:
+        result.append(
+            ProductViewItem(
+                viewed_at=item["viewed_at"],
+                product=ProductRead.model_validate(item["product"])
+            )
+        )
+
+    return ResponseModel.success(data=result)
+
 
 
 # ==============================================================================

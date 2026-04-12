@@ -20,6 +20,7 @@ from app.db.models.product import (
     ProductSku,
     ProductSpec,
 )
+from app.db.models.product_view import ProductView
 
 
 class CategoryRepository:
@@ -259,3 +260,51 @@ class ProductLevelCommissionRepository:
         )
         for item in items:
             self.db.add(ProductLevelCommission(product_id=product_id, **item))
+
+
+class ProductViewRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def upsert_view(self, user_id: UUID, product_id: UUID) -> None:
+        """
+        利用 PostgreSQL 的 INSERT ... ON CONFLICT DO UPDATE
+        实现唯一足迹记录并刷新 updatedAt 等同于 viewed_at 时间。
+        """
+        from sqlalchemy.dialects.postgresql import insert
+
+        stmt = insert(ProductView).values(user_id=user_id, product_id=product_id)
+        # SQLAlchemy 1.4+ / 2.0 中，如果不指定 columns，就意味着只触发表默认的 onupdate
+        # 我们这里的 onupdate 就是 Base 里的 updated_at 更新
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["user_id", "product_id"],
+            set_={"id": stmt.excluded.id} # 迫使触发表的 onupdate 机制
+        )
+        await self.db.execute(stmt)
+
+    async def trim_old_views(self, user_id: UUID, keep_limit: int = 50) -> None:
+        """修剪用户过老的足迹记录"""
+        # 1. 查出前 N 名的最早一条的 updated_at 时间（或 id）
+        # 更安全的做法: 查出需要保留的 ID 集合，然后删除不在这个集合内的。
+        subq = (
+            select(ProductView.id)
+            .where(ProductView.user_id == user_id)
+            .order_by(ProductView.updated_at.desc())
+            .limit(keep_limit)
+        )
+        stmt = delete(ProductView).where(
+            ProductView.user_id == user_id,
+            ProductView.id.not_in(subq)
+        )
+        await self.db.execute(stmt)
+
+    async def get_my_views(self, user_id: UUID, skip: int = 0, limit: int = 20) -> list[ProductView]:
+        """按时间倒序获取我的足迹"""
+        stmt = (
+            select(ProductView)
+            .where(ProductView.user_id == user_id)
+            .order_by(ProductView.updated_at.desc())
+            .offset(skip).limit(limit)
+        )
+        result = await self.db.scalars(stmt)
+        return list(result.all())

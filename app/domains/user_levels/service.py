@@ -126,6 +126,38 @@ class UserLevelService:
         """获取用户的等级档案"""
         return await self.profile_repo.get_by_user_id(user_id)
 
+    async def get_user_profile_detail(self, user_id: uuid.UUID) -> dict[str, Any]:
+        """获取用户完整的等级档案详情 (带上等级的基础信息)"""
+        profile = await self.profile_repo.get_by_user_id(user_id)
+        if not profile:
+            # 返回全0的默认状态
+            return {
+                "total_consume": Decimal("0"),
+                "total_points": 0,
+                "total_buy_number": 0,
+                "total_invite_number": 0,
+                "is_manual": False
+            }
+        
+        data = {
+            "total_consume": profile.total_consume,
+            "total_points": profile.total_points,
+            "total_buy_number": profile.total_buy_number,
+            "total_invite_number": profile.total_invite_number,
+            "is_manual": profile.is_manual,
+        }
+
+        if profile.level_id:
+            level = await self.level_repo.get_by_id(profile.level_id)
+            if level:
+                data.update({
+                    "level_name": level.name,
+                    "level_rank": level.rank_weight,
+                    "discount_rate": level.discount_rate,
+                    "icon_url": level.icon_url,
+                })
+        return data
+
     # ==========================================================================
     # 人工干预
     # ==========================================================================

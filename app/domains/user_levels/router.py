@@ -13,7 +13,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import DBSession
+from app.api.deps import CurrentUser, DBSession
 from app.core.response import ResponseModel
 from app.domains.user_levels.constants import UserLevelMsg
 from app.domains.user_levels.repository import (
@@ -21,7 +21,7 @@ from app.domains.user_levels.repository import (
     UserLevelRecordRepository,
     UserLevelRepository,
 )
-from app.domains.user_levels.schemas import UserLevelPublicOut
+from app.domains.user_levels.schemas import UserLevelProfileOut, UserLevelPublicOut
 from app.domains.user_levels.service import UserLevelService
 
 router = APIRouter()
@@ -66,3 +66,19 @@ async def get_level_list(
     levels = await service.get_active_levels()
     data = [UserLevelPublicOut.model_validate(lvl) for lvl in levels]
     return ResponseModel.success(data=data, message=UserLevelMsg.C_LEVEL_LIST)
+
+
+@router.get(
+    "/me",
+    response_model=ResponseModel[UserLevelProfileOut],
+    summary="获取我的等级与进度",
+    description="获取当前登录用户的身份等级信息、各项历史累计指标（总消费、邀请人数等），用于前端展示用户等级中心。",
+)
+async def get_my_level_profile(
+    current_user: CurrentUser,
+    service: LevelServiceDep,
+) -> ResponseModel[UserLevelProfileOut]:
+    """获取当前用户的等级档案与进度"""
+    data = await service.get_user_profile_detail(current_user.id)
+    out_data = UserLevelProfileOut.model_validate(data)
+    return ResponseModel.success(data=out_data)

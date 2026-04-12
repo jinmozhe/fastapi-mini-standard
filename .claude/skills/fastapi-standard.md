@@ -74,6 +74,25 @@ scripts/                 # 运维脚本
 
 **规则**：目录结构不可更改；禁止新增顶级目录；ORM 模型严禁放在 `domains/` 内，必须集中在 `app/db/models/`。
 
+### 已实现的核心基础设施模块 (`app/core/`)
+
+| 模块 | 文件 | 职责 |
+|------|------|------|
+| 配置中心 | `config.py` | pydantic-settings 统一配置 (.env) |
+| 响应信封 | `response.py` | `ResponseModel[T]` 统一 API 响应包装 |
+| 错误码 | `error_code.py` | `BaseErrorCode` 枚举基类 + 系统级错误 |
+| 异常体系 | `exceptions.py` | `AppException` + 四级全局异常处理器 |
+| 日志 | `logging.py` | Loguru + InterceptHandler + PII 自动脱敏 |
+| 中间件 | `middleware.py` | CORS / RequestID / AccessLog |
+| 审计 | `audit.py` | B端全量操作审计 (AuditLogMiddleware) |
+| 限流 | `rate_limit.py` | Redis 滑动窗口限流依赖 (RateLimiter) |
+| 验证码 | `captcha.py` | 云网关旁路校验 (CAPTCHA_ENABLE 热插拔) |
+| 缓存 | `redis.py` | Redis 异步客户端工厂 |
+| 安全 | `security.py` | Argon2id 密码哈希 + JWT (双端 aud 隔离) |
+| 短信 | `sms.py` | 短信验证码 (发送+验证+防刷+暴力破解保护) |
+| 微信 | `wechat.py` | 小程序code2session + 开放平台OAuth + AES解密 |
+| 校验 | `validators.py` | 共享正则常量 (手机号/区号) |
+
 ---
 
 ## 📚 核心工程规范
@@ -422,6 +441,15 @@ Created: 2026-01-15
 - [ ] **JWT 双端 `aud` 隔离**：B 端 Token 必须在 Payload 中注入 `aud: "backend"`，C 端 Token 注入 `aud: "frontend"`。`deps.py` 中的 `get_current_user` 和 `get_current_admin` 必须分别校验 `aud` 字段，拒绝跨端访问。
 - [ ] **AuditLogMiddleware 全量拦截规范**：`AuditLogMiddleware` 必须拦截 `/admin/` 路径下的所有请求（含 GET），采用旁路独立 Session 提交，写入失败不得阻塞主请求（Fail-Open）。请求体中的 password/token 等敏感字段必须自动脱敏为 `***` 后再落库。
 - [ ] **超级管理员种子脚本 (`seed_admin.py`)**：每个项目必须在 `scripts/seed_admin.py` 中提供幂等的超级管理员初始化脚本。该脚本需创建基础权限树、SUPER_ADMIN 角色并完成绑定。支持通过环境变量 `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD` 自定义账密。
+
+#### G. 多渠道认证与社交绑定安全 (Auth Multi-Channel)
+- [ ] **手机号锚点原则**：手机号是唯一身份标识，所有登录链路最终必须绑定手机号。密码字段必须可选 (`nullable=True`)，支持无密码注册。
+- [ ] **短信验证码安全链**：60秒发送冷却锁 + 5次错误自动销毁验证码 + 验证通过后立即删除 + `sms_logs` 审计表永久留存。
+- [ ] **微信工具旁路开关**：AppID/AppSecret 为空时必须返回固定测试数据，严禁不配置就崩溃。
+- [ ] **社交绑定 platform 白名单**：`platform` 字段只允许 `wechat_mini`, `wechat_mp`, `wechat_web`，必须在 Service 层或 Schema 层校验。
+- [ ] **解绑安全检查**：解绑前必须检查用户是否至少保留一种登录方式（密码或其他社交绑定），否则拒绝解绑。
+- [ ] **临时凭证安全**：扫码登录 temp_token 必须存 Redis (5分钟 TTL + 一次性消费)，禁止存数据库或内存。
+- [ ] **软删除手机号不可复活**：已注销用户的手机号不得被重新注册，必须返回"该手机号关联的账号已被注销"。
 
 ---
 

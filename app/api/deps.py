@@ -115,6 +115,46 @@ async def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+async def get_optional_current_user(
+    authorization: Annotated[str | None, Header()] = None,
+    session: AsyncSession = Depends(get_db),
+) -> User | None:
+    """
+    可选的 C 端用户依赖。
+    如果客户端没传 Token 或 Token 失效，不抛错，静默返回 None。
+    """
+    if not authorization:
+        return None
+
+    scheme, _, param = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not param:
+        return None
+
+    try:
+        payload = jwt.decode(
+            param,
+            settings.SECRET_KEY, # type: ignore
+            algorithms=[settings.ALGORITHM],
+            options={"verify_aud": False},
+        )
+        if payload.get("aud") == "backend":
+            return None
+
+        user_id_str = payload.get("sub")
+        if not user_id_str:
+            return None
+            
+        user = await session.get(User, user_id_str)
+        if user and not user.is_deleted and user.is_active:
+            return user
+    except PyJWTError:
+        pass
+
+    return None
+
+OptionalCurrentUser = Annotated[User | None, Depends(get_optional_current_user)]
+
+
 # ------------------------------------------------------------------------------
 # 3. B端管理员认证依赖 (JWT 鉴权 - 后台管理员)
 # ------------------------------------------------------------------------------

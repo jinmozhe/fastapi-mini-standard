@@ -44,7 +44,9 @@ from app.domains.auth.schemas import (
     RegisterRequest,
     SmsLoginRequest,
     Token,
+    WechatCompleteRequest,
     WechatLoginRequest,
+    WechatScanResponse,
 )
 from app.domains.users.repository import UserRepository
 
@@ -429,6 +431,232 @@ class AuthService:
 
         except (ValueError, Exception) as e:
             logger.warning(f"推荐关系绑定失败 (不影响注册): {e}")
+
+    # ==========================================================================
+    # 已登录用户绑定微信
+    # ==========================================================================
+
+    async def bind_wechat(
+        self,
+        user_id: uuid_mod.UUID,
+        code: str,
+        platform: str = "wechat_mini",
+    ) -> None:
+        """
+        已登录用户绑定微信。
+
+        流程：
+        1. 根据 platform 选择调用小程序 code2session 或开放平台 code2access_token
+        2. 检查该 openid 是否已被别人绑定
+        3. 创建 UserSocial 绑定记录
+        """
+        assert self.social_repo is not None
+
+        # 1. 根据平台获取 openid
+        if platform == "wechat_mini":
+            session_result = await code2session(code)
+            openid = session_result.openid
+            unionid = session_result.unionid
+            session_key = session_result.session_key
+        else:
+            from app.core.wechat import code2access_token
+            oauth_result = await code2access_token(code)
+            openid = oauth_result.openid
+            unionid = oauth_result.unionid
+            session_key = None
+
+        # 2. 检查是否已被绑定
+        existing = await self.social_repo.get_by_platform_openid(platform, openid)
+        if existing:
+            if existing.user_id == user_id:
+                return  # 已绑定到自己，静默成功
+            raise AppException(AuthError.WECHAT_ALREADY_BOUND)
+
+        # 3. 创建绑定
+        social = UserSocial(
+            user_id=user_id,
+            platform=platform,
+            openid=openid,
+            unionid=unionid,
+            session_key=session_key,
+        )
+        await self.social_repo.create_binding(social)
+        await self.user_repo.session.commit()
+
+    # ==========================================================================
+    # 已登录用户解绑微信
+    # ==========================================================================
+
+    async def unbind_wechat(
+        self,
+        user_id: uuid_mod.UUID,
+        platform: str = "wechat_mini",
+    ) -> None:
+        """
+        解绑微信。删除当前用户在指定平台的绑定记录。
+        """
+        assert self.social_repo is not None
+        from sqlalchemy import select, delete
+
+        stmt = select(UserSocial).where(
+            UserSocial.user_id == user_id,
+            UserSocial.platform == platform,
+        )
+        result = await self.user_repo.session.execute(stmt)
+        social = result.scalar_one_or_none()
+
+        if not social:
+            raise AppException(AuthError.WECHAT_NOT_BOUND)
+
+        await self.user_repo.session.delete(social)
+        await self.user_repo.session.commit()
+
+    # ==========================================================================
+    # 网页端微信扫码登录
+    # ==========================================================================
+
+    async def wechat_scan_login(self, code: str) -> WechatScanResponse:
+        """
+        网页端微信扫码登录。
+
+        流程：
+        1. 用 code 换取 openid
+        2. 查 user_socials: 是否已有绑定？
+           - 有 → 老用户，直接签发正式 Token
+           - 没有 → 新用户，生成临时凭证，要求绑定手机号
+        """
+        assert self.social_repo is not None
+        from app.core.wechat import code2access_token
+
+        # 1. 获取 openid
+        oauth_result = await code2access_token(code)
+
+        # 2. 查绑定
+        social = await self.social_repo.get_by_platform_openid(
+            "wechat_web", oauth_result.openid
+        )
+
+        if social:
+            # 老用户 → 直接登录
+            user = await self.user_repo.get(str(social.user_id))
+            if not user or user.is_deleted or not user.is_active:
+                raise AppException(AuthError.ACCOUNT_LOCKED)
+
+            token = await self._create_tokens(user_id=str(user.id))
+            return WechatScanResponse(
+                is_new=False,
+                token=token,
+                nickname=social.nickname,
+                avatar=social.avatar,
+            )
+
+        # 新用户 → 生成临时凭证，存入 Redis (5 分钟 TTL)
+        import secrets
+        temp_token = secrets.token_urlsafe(32)
+        import json
+        temp_data = json.dumps({
+            "openid": oauth_result.openid,
+            "unionid": oauth_result.unionid,
+            "nickname": oauth_result.nickname,
+            "avatar": oauth_result.avatar,
+            "platform": "wechat_web",
+        })
+        await self.redis.setex(
+            f"wechat_temp:{temp_token}", 300, temp_data
+        )
+
+        return WechatScanResponse(
+            is_new=True,
+            temp_token=temp_token,
+            nickname=oauth_result.nickname,
+            avatar=oauth_result.avatar,
+        )
+
+    # ==========================================================================
+    # 扫码登录 → 完成注册 (绑定手机号)
+    # ==========================================================================
+
+    async def wechat_complete_registration(
+        self,
+        data: WechatCompleteRequest,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> Token:
+        """
+        扫码登录后绑定手机号完成注册。
+
+        流程：
+        1. 从 Redis 取出临时凭证数据 (openid/unionid 等)
+        2. 验证短信验证码
+        3. 用手机号查库做合流或新建
+        4. 创建 UserSocial 绑定
+        5. 签发正式 Token
+        """
+        assert self.social_repo is not None
+
+        # 1. 取临时凭证
+        import json
+        temp_data_raw = await self.redis.get(f"wechat_temp:{data.temp_token}")
+        if not temp_data_raw:
+            raise AppException(AuthError.TEMP_TOKEN_INVALID)
+
+        temp_str = temp_data_raw if isinstance(temp_data_raw, str) else temp_data_raw.decode()
+        temp_info = json.loads(temp_str)
+
+        # 立即销毁临时凭证 (一次性)
+        await self.redis.delete(f"wechat_temp:{data.temp_token}")
+
+        # 2. 验证短信验证码
+        await verify_sms_code(self.redis, data.phone_code, data.mobile, data.code)
+
+        # 3. 用手机号做合流
+        user = await self.user_repo.get_by_mobile(data.phone_code, data.mobile)
+        is_new = False
+
+        if not user:
+            user = User(
+                phone_code=data.phone_code,
+                mobile=data.mobile,
+                hashed_password=None,
+                nickname=temp_info.get("nickname"),
+                avatar=temp_info.get("avatar"),
+            )
+            self.user_repo.session.add(user)
+            await self.user_repo.session.flush()
+            is_new = True
+            logger.bind(user_id=str(user.id)).info("用户通过微信扫码+手机号完成注册")
+
+        if not user.is_active:
+            raise AppException(AuthError.ACCOUNT_LOCKED)
+
+        # 4. 创建社交绑定
+        social = UserSocial(
+            user_id=user.id,
+            platform=temp_info.get("platform", "wechat_web"),
+            openid=temp_info["openid"],
+            unionid=temp_info.get("unionid"),
+            nickname=temp_info.get("nickname"),
+            avatar=temp_info.get("avatar"),
+        )
+        await self.social_repo.create_binding(social)
+
+        # 推荐关系
+        if is_new and data.inviter_id:
+            await self._bind_inviter(user.id, data.inviter_id)
+
+        # 登录日志
+        login_log = LoginLog(
+            actor_type="user",
+            actor_id=str(user.id),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            status=True,
+            reason="微信扫码+手机号注册成功",
+        )
+        self.user_repo.session.add(login_log)
+        await self.user_repo.session.commit()
+
+        return await self._create_tokens(user_id=str(user.id))
 
     # ==========================================================================
     # Token 刷新 (Rotation 策略)

@@ -104,6 +104,28 @@ class AuthError(BaseErrorCode):
         "您尚未设置密码，请使用短信验证码或微信登录",
     )
 
+    # ---------- 社交绑定相关 ----------
+    WECHAT_ALREADY_BOUND = (
+        HTTP_409_CONFLICT,
+        "auth.wechat_already_bound",
+        "该微信已绑定其他账号",
+    )
+    WECHAT_NOT_BOUND = (
+        HTTP_404_NOT_FOUND,
+        "auth.wechat_not_bound",
+        "未找到微信绑定记录",
+    )
+    TEMP_TOKEN_INVALID = (
+        HTTP_403_FORBIDDEN,
+        "auth.temp_token_invalid",
+        "临时凭证无效或已过期，请重新扫码",
+    )
+    PHONE_ALREADY_BOUND = (
+        HTTP_409_CONFLICT,
+        "auth.phone_already_bound",
+        "该手机号已绑定其他账号",
+    )
+
 
 # ==============================================================================
 # 2. 成功提示语 (Success Messages)
@@ -124,3 +146,7 @@ class AuthMsg:
     SMS_SEND_SUCCESS = "验证码已发送"
     SMS_LOGIN_SUCCESS = "登录成功"
     WECHAT_LOGIN_SUCCESS = "微信登录成功"
+    WECHAT_BIND_SUCCESS = "微信绑定成功"
+    WECHAT_UNBIND_SUCCESS = "微信解绑成功"
+    WECHAT_SCAN_NEW_USER = "请绑定手机号完成注册"
+    WECHAT_COMPLETE_SUCCESS = "注册完成"

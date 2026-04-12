@@ -128,10 +128,14 @@ class Settings(BaseSettings):
     SMS_SEND_INTERVAL: int = 60
 
     # --------------------------------------------------------------------------
-    # 8. WeChat Mini Program Settings (微信小程序)
+    # 8. WeChat Settings (微信生态)
     # --------------------------------------------------------------------------
+    # 小程序
     WECHAT_MINI_APP_ID: str = ""
     WECHAT_MINI_APP_SECRET: str = ""
+    # 开放平台 (网页扫码登录)
+    WECHAT_OPEN_APP_ID: str = ""
+    WECHAT_OPEN_APP_SECRET: str = ""
 
     # --------------------------------------------------------------------------
     # Properties (便捷属性)

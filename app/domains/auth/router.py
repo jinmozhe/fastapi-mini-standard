@@ -34,6 +34,7 @@ from app.db.models.sms_log import SmsLog
 from app.db.models.user import User
 from app.db.models.user_social import UserSocial
 
+from app.api.deps import CurrentUser
 from app.domains.auth.constants import AuthMsg
 from app.domains.auth.repository import SmsLogRepository, UserSocialRepository
 from app.domains.auth.schemas import (
@@ -43,7 +44,11 @@ from app.domains.auth.schemas import (
     SmsCodeRequest,
     SmsLoginRequest,
     Token,
+    WechatBindRequest,
+    WechatCompleteRequest,
     WechatLoginRequest,
+    WechatScanRequest,
+    WechatScanResponse,
 )
 from app.domains.auth.service import AuthService
 from app.domains.users.repository import UserRepository
@@ -282,4 +287,125 @@ async def wechat_login(
     req_id = getattr(request.state, "request_id", None)
     return ResponseModel.success(
         data=token, message=AuthMsg.WECHAT_LOGIN_SUCCESS, request_id=req_id
+    )
+
+
+# ------------------------------------------------------------------------------
+# 社交绑定 / 解绑接口 (需要登录)
+# ------------------------------------------------------------------------------
+
+
+@router.post(
+    "/bind/wechat",
+    response_model=ResponseModel[None],
+    summary="绑定微信",
+    description=(
+        "已登录用户绑定微信账号。\n\n"
+        "前端通过微信 SDK 获取授权 code 后提交。\n\n"
+        "platform 可选值: `wechat_mini`(小程序), `wechat_mp`(公众号), `wechat_web`(网页)"
+    ),
+)
+async def bind_wechat(
+    request: Request,
+    bind_data: WechatBindRequest,
+    user: CurrentUser,
+    service: AuthServiceDep,
+) -> ResponseModel[None]:
+    """绑定微信"""
+    await service.bind_wechat(
+        user_id=user.id,
+        code=bind_data.code,
+        platform=bind_data.platform,
+    )
+    req_id = getattr(request.state, "request_id", None)
+    return ResponseModel.success(
+        data=None, message=AuthMsg.WECHAT_BIND_SUCCESS, request_id=req_id
+    )
+
+
+@router.delete(
+    "/bind/wechat",
+    response_model=ResponseModel[None],
+    summary="解绑微信",
+    description=(
+        "解除当前用户在指定平台的微信绑定。\n\n"
+        "解绑后用户仍可通过手机号+验证码或密码登录。"
+    ),
+)
+async def unbind_wechat(
+    request: Request,
+    user: CurrentUser,
+    service: AuthServiceDep,
+    platform: str = "wechat_mini",
+) -> ResponseModel[None]:
+    """解绑微信"""
+    await service.unbind_wechat(user_id=user.id, platform=platform)
+    req_id = getattr(request.state, "request_id", None)
+    return ResponseModel.success(
+        data=None, message=AuthMsg.WECHAT_UNBIND_SUCCESS, request_id=req_id
+    )
+
+
+# ------------------------------------------------------------------------------
+# 网页端微信扫码登录 (无需登录)
+# ------------------------------------------------------------------------------
+
+
+@router.post(
+    "/wechat/scan",
+    response_model=ResponseModel[WechatScanResponse],
+    summary="网页端微信扫码登录",
+    description=(
+        "网页端微信扫码登录。\n\n"
+        "如果是已绑定的老用户，直接返回正式 Token (is_new=false)。\n\n"
+        "如果是新用户，返回 temp_token (is_new=true)，"
+        "前端需引导用户绑定手机号，然后调用 /wechat/complete 完成注册。"
+    ),
+)
+async def wechat_scan_login(
+    request: Request,
+    scan_data: WechatScanRequest,
+    service: AuthServiceDep,
+) -> ResponseModel[WechatScanResponse]:
+    """网页端微信扫码登录"""
+    result = await service.wechat_scan_login(scan_data.code)
+
+    message = (
+        AuthMsg.WECHAT_LOGIN_SUCCESS if not result.is_new
+        else AuthMsg.WECHAT_SCAN_NEW_USER
+    )
+    req_id = getattr(request.state, "request_id", None)
+    return ResponseModel.success(
+        data=result, message=message, request_id=req_id
+    )
+
+
+@router.post(
+    "/wechat/complete",
+    response_model=ResponseModel[Token],
+    summary="扫码登录 — 完成注册 (绑定手机号)",
+    description=(
+        "扫码登录后新用户绑定手机号完成注册。\n\n"
+        "需提供扫码时获得的 `temp_token`，"
+        "以及手机号+短信验证码。\n\n"
+        "temp_token 有效期 5 分钟，一次性使用。"
+    ),
+    dependencies=[Depends(RateLimiter(times=10, seconds=60))],
+)
+async def wechat_complete(
+    request: Request,
+    complete_data: WechatCompleteRequest,
+    service: AuthServiceDep,
+) -> ResponseModel[Token]:
+    """扫码登录 — 完成注册"""
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    token = await service.wechat_complete_registration(
+        complete_data, ip_address=ip_address, user_agent=user_agent
+    )
+
+    req_id = getattr(request.state, "request_id", None)
+    return ResponseModel.success(
+        data=token, message=AuthMsg.WECHAT_COMPLETE_SUCCESS, request_id=req_id
     )

@@ -242,3 +242,117 @@ class WechatLoginRequest(BaseModel):
         default=None,
         description="推荐人用户 ID (可选，用于分销关系绑定)",
     )
+
+
+# ==============================================================================
+# 社交绑定 / 网页扫码登录模型
+# ==============================================================================
+
+
+class WechatBindRequest(BaseModel):
+    """
+    已登录用户绑定微信请求。
+    前端唤起微信授权获取 code（小程序用 wx.login()，网页用 OAuth 回调）。
+    """
+
+    code: str = Field(
+        ...,
+        description="微信授权 code（小程序或开放平台均可）",
+    )
+    platform: str = Field(
+        default="wechat_mini",
+        description="绑定平台: wechat_mini / wechat_mp / wechat_web",
+    )
+
+
+class WechatScanRequest(BaseModel):
+    """
+    网页端微信扫码登录请求。
+    前端引导用户到微信扫码页 → 拿到回调 code → 提交给后端。
+    """
+
+    code: str = Field(
+        ...,
+        description="微信开放平台 OAuth 回调的 code",
+    )
+
+
+class WechatScanResponse(BaseModel):
+    """
+    网页扫码登录的响应。
+    老用户：直接返回 token；
+    新用户：返回 temp_token，前端需引导用户绑定手机号。
+    """
+
+    is_new: bool = Field(
+        ...,
+        description="是否为新用户（需要绑定手机号）",
+    )
+    token: Token | None = Field(
+        default=None,
+        description="已有用户的正式 Token（is_new=false 时返回）",
+    )
+    temp_token: str | None = Field(
+        default=None,
+        description="新用户的临时凭证（is_new=true 时返回，用于 /wechat/complete）",
+    )
+    nickname: str | None = Field(
+        default=None,
+        description="微信昵称（供前端预填）",
+    )
+    avatar: str | None = Field(
+        default=None,
+        description="微信头像 URL（供前端预填）",
+    )
+
+
+class WechatCompleteRequest(BaseModel):
+    """
+    网页扫码登录 — 完成注册（绑定手机号）。
+    新用户扫码后必须验证手机号才能完成注册。
+    """
+
+    temp_token: str = Field(
+        ...,
+        description="扫码时返回的临时凭证",
+    )
+    phone_code: str = Field(
+        default="+86",
+        description="手机区号",
+    )
+    mobile: str = Field(
+        ...,
+        description="手机号码",
+        examples=["13800000000"],
+    )
+    code: str = Field(
+        ...,
+        min_length=4,
+        max_length=8,
+        description="短信验证码",
+    )
+    inviter_id: str | None = Field(
+        default=None,
+        description="推荐人用户 ID",
+    )
+
+    @field_validator("phone_code", mode="before")
+    @classmethod
+    def default_phone_code(cls, v: str | None) -> str:
+        if not v:
+            return "+86"
+        return v
+
+    @field_validator("phone_code")
+    @classmethod
+    def validate_phone_code(cls, v: str) -> str:
+        if not PHONE_CODE_PATTERN.match(v):
+            raise ValueError(PHONE_CODE_ERROR_MESSAGE)
+        return v
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        if not MOBILE_PATTERN.match(v):
+            raise ValueError(MOBILE_ERROR_MESSAGE)
+        return v

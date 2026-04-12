@@ -1,16 +1,18 @@
 """
 File: app/core/wechat.py
-Description: 微信小程序工具模块
+Description: 微信工具模块 (小程序 + 开放平台)
 
 职责：
-1. code2session()       — 用 wx.login() 的 code 换取 openid + session_key
-2. decrypt_phone_number() — AES-128-CBC 解密微信加密的手机号数据包
+1. code2session()         — 小程序: wx.login() 的 code 换取 openid + session_key
+2. decrypt_phone_number()  — 小程序: AES-128-CBC 解密微信加密的手机号数据包
+3. code2access_token()     — 开放平台: 网页扫码授权 code 换取 openid + access_token
 
 旁路逃生阀：
-  如果 WECHAT_MINI_APP_ID 为空，模拟返回固定测试数据，方便本地开发。
+  如果对应的 AppID 为空，模拟返回固定测试数据，方便本地开发。
 
 Author: jinmozhe
 Created: 2026-04-12
+Updated: 2026-04-12 (新增开放平台 OAuth 支持)
 """
 
 import base64
@@ -29,7 +31,7 @@ from app.domains.auth.constants import AuthError
 
 @dataclass
 class WechatSessionResult:
-    """code2session 返回结果"""
+    """code2session 返回结果 (小程序)"""
     openid: str
     session_key: str
     unionid: str | None = None
@@ -43,18 +45,27 @@ class WechatPhoneResult:
     country_code: str        # 国家区号（如 86）
 
 
+@dataclass
+class WechatOAuthResult:
+    """开放平台网页授权结果"""
+    openid: str
+    access_token: str
+    unionid: str | None = None
+    nickname: str | None = None
+    avatar: str | None = None
+
+
+# ==============================================================================
+# 小程序相关
+# ==============================================================================
+
+
 async def code2session(js_code: str) -> WechatSessionResult:
     """
     用前端 wx.login() 返回的临时 code 向微信服务器换取 openid 和 session_key。
 
     微信官方接口文档：
     https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/user-login/code2Session.html
-
-    Args:
-        js_code: 前端 wx.login() 返回的 code（有效期 5 分钟，一次性）
-
-    Returns:
-        WechatSessionResult: 包含 openid, session_key, unionid(可选)
     """
     # 旁路模式：未配置 AppID 时返回测试数据
     if not settings.WECHAT_MINI_APP_ID:
@@ -78,7 +89,6 @@ async def code2session(js_code: str) -> WechatSessionResult:
             response = await client.get(url, params=params)
             data = response.json()
 
-        # 微信错误码判断
         if "errcode" in data and data["errcode"] != 0:
             logger.error(f"[WeChat] code2session 失败: {data}")
             raise AppException(AuthError.WECHAT_AUTH_FAILED)
@@ -106,17 +116,7 @@ def decrypt_phone_number(
 ) -> WechatPhoneResult:
     """
     解密微信小程序 getPhoneNumber 返回的加密手机号数据。
-
-    微信使用 AES-128-CBC 加密，密钥为 session_key 的 Base64 解码值，
-    填充方式为 PKCS#7。
-
-    Args:
-        session_key: code2session 获取的会话密钥
-        encrypted_data: wx.getPhoneNumber 返回的加密数据
-        iv: 加密初始向量
-
-    Returns:
-        WechatPhoneResult: 解密后的手机号信息
+    微信使用 AES-128-CBC 加密，密钥为 session_key 的 Base64 解码值。
     """
     # 旁路模式
     if not settings.WECHAT_MINI_APP_ID:
@@ -128,21 +128,17 @@ def decrypt_phone_number(
         )
 
     try:
-        # Base64 解码
         aes_key = base64.b64decode(session_key)
         aes_iv = base64.b64decode(iv)
         cipher_text = base64.b64decode(encrypted_data)
 
-        # AES-128-CBC 解密
         cipher = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv))
         decryptor = cipher.decryptor()
         padded_data = decryptor.update(cipher_text) + decryptor.finalize()
 
-        # PKCS7 去填充
         unpadder = PKCS7(128).unpadder()
         plain_data = unpadder.update(padded_data) + unpadder.finalize()
 
-        # 解析明文 JSON
         phone_info = json.loads(plain_data.decode("utf-8"))
 
         return WechatPhoneResult(
@@ -154,3 +150,89 @@ def decrypt_phone_number(
     except Exception as e:
         logger.error(f"[WeChat] 手机号解密失败: {e}")
         raise AppException(AuthError.WECHAT_DECRYPT_FAILED)
+
+
+# ==============================================================================
+# 开放平台：网页端微信扫码登录
+# ==============================================================================
+
+
+async def code2access_token(code: str) -> WechatOAuthResult:
+    """
+    网页端微信扫码授权：用 code 换取 access_token + openid。
+
+    流程：
+    1. 前端引导用户跳转微信扫码页面（带 redirect_uri）
+    2. 用户扫码授权后，微信回调 redirect_uri 并附带 code
+    3. 后端用 code 向微信换取 access_token + openid
+    4. (可选) 用 access_token 拉取用户信息（昵称、头像）
+
+    文档：https://developers.weixin.qq.com/doc/oplatform/Website_App/WeChat_Login/Wechat_Login.html
+    """
+    # 旁路模式
+    if not settings.WECHAT_OPEN_APP_ID:
+        logger.warning("[WeChat-Bypass] 开放平台未配置 AppID，返回模拟数据")
+        return WechatOAuthResult(
+            openid="test_web_openid_mock_67890",
+            access_token="test_access_token_mock",
+            unionid="test_unionid_mock",
+            nickname="测试用户",
+            avatar=None,
+        )
+
+    # Step 1: code 换 access_token + openid
+    token_url = "https://api.weixin.qq.com/sns/oauth2/access_token"
+    params = {
+        "appid": settings.WECHAT_OPEN_APP_ID,
+        "secret": settings.WECHAT_OPEN_APP_SECRET,
+        "code": code,
+        "grant_type": "authorization_code",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(token_url, params=params)
+            data = resp.json()
+
+            if "errcode" in data and data["errcode"] != 0:
+                logger.error(f"[WeChat-Open] code 换 token 失败: {data}")
+                raise AppException(AuthError.WECHAT_AUTH_FAILED)
+
+            openid = data["openid"]
+            access_token = data["access_token"]
+            unionid = data.get("unionid")
+
+            # Step 2: 拉取用户基础信息（昵称、头像）
+            nickname = None
+            avatar = None
+            try:
+                userinfo_url = "https://api.weixin.qq.com/sns/userinfo"
+                info_resp = await client.get(
+                    userinfo_url,
+                    params={"access_token": access_token, "openid": openid},
+                )
+                info_data = info_resp.json()
+                if info_data.get("errcode") is None or info_data.get("errcode") == 0:
+                    nickname = info_data.get("nickname")
+                    avatar = info_data.get("headimgurl")
+                    if not unionid:
+                        unionid = info_data.get("unionid")
+            except Exception as e:
+                logger.warning(f"[WeChat-Open] 拉取用户信息失败 (不影响主流程): {e}")
+
+            return WechatOAuthResult(
+                openid=openid,
+                access_token=access_token,
+                unionid=unionid,
+                nickname=nickname,
+                avatar=avatar,
+            )
+
+    except httpx.TimeoutException:
+        logger.error("[WeChat-Open] 请求超时")
+        raise AppException(AuthError.WECHAT_AUTH_FAILED)
+    except AppException:
+        raise
+    except Exception as e:
+        logger.error(f"[WeChat-Open] 异常: {e}")
+        raise AppException(AuthError.WECHAT_AUTH_FAILED)

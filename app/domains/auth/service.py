@@ -38,6 +38,7 @@ from app.core.security import (
     verify_password_async,
 )
 from app.domains.auth.constants import AuthError
+from app.core.error_code import SystemErrorCode
 from app.domains.auth.repository import UserSocialRepository
 from app.domains.auth.schemas import (
     LoginRequest,
@@ -226,11 +227,22 @@ class AuthService:
         # 1. 验证短信验证码
         await verify_sms_code(self.redis, data.phone_code, data.mobile, data.code)
 
-        # 2. 查库
+        # 2. 查库 (get_by_mobile 自动过滤 is_deleted=True)
         user = await self.user_repo.get_by_mobile(data.phone_code, data.mobile)
         is_new = False
 
         if not user:
+            # 安全兜底：检查是否有已注销的同手机号用户
+            from sqlalchemy import select
+            deleted_check = select(User).where(
+                User.phone_code == data.phone_code,
+                User.mobile == data.mobile,
+                User.is_deleted.is_(True),
+            )
+            deleted_result = await self.user_repo.session.execute(deleted_check)
+            if deleted_result.scalar_one_or_none():
+                raise AppException(AuthError.ACCOUNT_DELETED)
+
             # 3. 自动注册 (无密码用户)
             user = User(
                 phone_code=data.phone_code,
@@ -436,6 +448,9 @@ class AuthService:
     # 已登录用户绑定微信
     # ==========================================================================
 
+    # platform 白名单
+    ALLOWED_PLATFORMS = {"wechat_mini", "wechat_mp", "wechat_web"}
+
     async def bind_wechat(
         self,
         user_id: uuid_mod.UUID,
@@ -446,13 +461,21 @@ class AuthService:
         已登录用户绑定微信。
 
         流程：
-        1. 根据 platform 选择调用小程序 code2session 或开放平台 code2access_token
-        2. 检查该 openid 是否已被别人绑定
-        3. 创建 UserSocial 绑定记录
+        1. 校验 platform 白名单
+        2. 根据 platform 选择调用小程序 code2session 或开放平台 code2access_token
+        3. 检查该 openid 是否已被别人绑定
+        4. 创建 UserSocial 绑定记录
         """
         assert self.social_repo is not None
 
-        # 1. 根据平台获取 openid
+        # 1. platform 白名单校验
+        if platform not in self.ALLOWED_PLATFORMS:
+            raise AppException(
+                SystemErrorCode.BAD_REQUEST,
+                message=f"不支持的平台类型: {platform}",
+            )
+
+        # 2. 根据平台获取 openid
         if platform == "wechat_mini":
             session_result = await code2session(code)
             openid = session_result.openid
@@ -465,14 +488,14 @@ class AuthService:
             unionid = oauth_result.unionid
             session_key = None
 
-        # 2. 检查是否已被绑定
+        # 3. 检查是否已被绑定
         existing = await self.social_repo.get_by_platform_openid(platform, openid)
         if existing:
             if existing.user_id == user_id:
                 return  # 已绑定到自己，静默成功
             raise AppException(AuthError.WECHAT_ALREADY_BOUND)
 
-        # 3. 创建绑定
+        # 4. 创建绑定
         social = UserSocial(
             user_id=user_id,
             platform=platform,
@@ -494,10 +517,14 @@ class AuthService:
     ) -> None:
         """
         解绑微信。删除当前用户在指定平台的绑定记录。
+
+        安全检查：确保用户至少保留一种登录方式（密码或其他社交绑定），
+        否则解绑后将无法登录。
         """
         assert self.social_repo is not None
-        from sqlalchemy import select, delete
+        from sqlalchemy import select, func
 
+        # 查找要解绑的记录
         stmt = select(UserSocial).where(
             UserSocial.user_id == user_id,
             UserSocial.platform == platform,
@@ -507,6 +534,23 @@ class AuthService:
 
         if not social:
             raise AppException(AuthError.WECHAT_NOT_BOUND)
+
+        # 安全检查：解绑后用户是否还有其他登录方式？
+        user = await self.user_repo.get(str(user_id))
+        has_password = user and user.hashed_password
+
+        # 统计该用户的其他社交绑定数量
+        count_stmt = select(func.count()).select_from(UserSocial).where(
+            UserSocial.user_id == user_id,
+            UserSocial.platform != platform,
+        )
+        count_result = await self.user_repo.session.execute(count_stmt)
+        other_bindings = count_result.scalar_one()
+
+        if not has_password and other_bindings == 0:
+            raise AppException(
+                AuthError.UNBIND_LAST_METHOD,
+            )
 
         await self.user_repo.session.delete(social)
         await self.user_repo.session.commit()
@@ -609,11 +653,22 @@ class AuthService:
         # 2. 验证短信验证码
         await verify_sms_code(self.redis, data.phone_code, data.mobile, data.code)
 
-        # 3. 用手机号做合流
+        # 3. 用手机号做合流 (get_by_mobile 自动过滤 is_deleted)
         user = await self.user_repo.get_by_mobile(data.phone_code, data.mobile)
         is_new = False
 
         if not user:
+            # 安全兜底：检查是否有已注销的同手机号用户
+            from sqlalchemy import select as sa_select
+            deleted_check = sa_select(User).where(
+                User.phone_code == data.phone_code,
+                User.mobile == data.mobile,
+                User.is_deleted.is_(True),
+            )
+            deleted_result = await self.user_repo.session.execute(deleted_check)
+            if deleted_result.scalar_one_or_none():
+                raise AppException(AuthError.ACCOUNT_DELETED)
+
             user = User(
                 phone_code=data.phone_code,
                 mobile=data.mobile,
@@ -657,6 +712,50 @@ class AuthService:
         await self.user_repo.session.commit()
 
         return await self._create_tokens(user_id=str(user.id))
+
+    # ==========================================================================
+    # 设置/修改密码
+    # ==========================================================================
+
+    async def set_password(
+        self,
+        user_id: uuid_mod.UUID,
+        new_password: str,
+        old_password: str | None = None,
+    ) -> None:
+        """
+        设置或修改密码。
+
+        场景：
+        - 无密码用户首次设置密码：old_password 为空即可
+        - 已有密码用户修改密码：必须验证 old_password
+
+        Args:
+            user_id: 当前登录用户 ID
+            new_password: 新密码
+            old_password: 旧密码（已有密码时必传）
+        """
+        user = await self.user_repo.get(str(user_id))
+        if not user:
+            raise AppException(SystemErrorCode.UNAUTHORIZED)
+
+        # 如果已有密码，必须验证旧密码
+        if user.hashed_password:
+            if not old_password:
+                raise AppException(
+                    AuthError.INVALID_CREDENTIALS,
+                    message="修改密码需要提供旧密码",
+                )
+            if not await verify_password_async(old_password, user.hashed_password):
+                raise AppException(
+                    AuthError.INVALID_CREDENTIALS,
+                    message="旧密码错误",
+                )
+
+        # 哈希新密码并保存
+        user.hashed_password = await get_password_hash_async(new_password)
+        await self.user_repo.session.commit()
+        logger.bind(user_id=str(user_id)).info("用户密码已更新")
 
     # ==========================================================================
     # Token 刷新 (Rotation 策略)

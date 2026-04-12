@@ -41,6 +41,7 @@ from app.domains.auth.schemas import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    SetPasswordRequest,
     SmsCodeRequest,
     SmsLoginRequest,
     Token,
@@ -408,4 +409,36 @@ async def wechat_complete(
     req_id = getattr(request.state, "request_id", None)
     return ResponseModel.success(
         data=token, message=AuthMsg.WECHAT_COMPLETE_SUCCESS, request_id=req_id
+    )
+
+
+# ------------------------------------------------------------------------------
+# 密码管理 (需要登录)
+# ------------------------------------------------------------------------------
+
+
+@router.post(
+    "/password",
+    response_model=ResponseModel[None],
+    summary="设置/修改密码",
+    description=(
+        "无密码用户（短信/小程序注册）可直接设置密码，无需提供旧密码。\n\n"
+        "已有密码的用户修改密码时必须提供 old_password。"
+    ),
+)
+async def set_password(
+    request: Request,
+    password_data: SetPasswordRequest,
+    user: CurrentUser,
+    service: AuthServiceDep,
+) -> ResponseModel[None]:
+    """设置/修改密码"""
+    await service.set_password(
+        user_id=user.id,
+        new_password=password_data.new_password,
+        old_password=password_data.old_password,
+    )
+    req_id = getattr(request.state, "request_id", None)
+    return ResponseModel.success(
+        data=None, message=AuthMsg.SET_PASSWORD_SUCCESS, request_id=req_id
     )

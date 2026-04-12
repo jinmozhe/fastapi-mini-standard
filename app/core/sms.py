@@ -99,14 +99,28 @@ async def verify_sms_code(
     验证短信验证码。
 
     流程：
-    1. 从 Redis 读取存储的验证码
-    2. 比对是否一致
-    3. 验证通过后立即删除（防重放）
+    1. 检查是否已被锁定（5 次错误后自动锁定）
+    2. 从 Redis 读取存储的验证码
+    3. 比对是否一致
+    4. 错误时累加计数器，达到上限就删除验证码
+    5. 验证通过后立即删除（防重放）
 
     Raises:
         AppException: 验证码错误或已过期
     """
     code_key = _code_key(phone_code, mobile)
+    attempts_key = f"sms_attempts:{phone_code}:{mobile}"
+    max_attempts = 5
+
+    # 1. 检查错误次数是否已达上限
+    attempts_raw = await redis.get(attempts_key)
+    if attempts_raw:
+        attempts = int(attempts_raw if isinstance(attempts_raw, str) else attempts_raw.decode())
+        if attempts >= max_attempts:
+            # 已超限，直接清除验证码和计数器
+            await redis.delete(code_key, attempts_key)
+            raise AppException(AuthError.SMS_CODE_INVALID)
+
     stored_code = await redis.get(code_key)
 
     if not stored_code:
@@ -116,10 +130,16 @@ async def verify_sms_code(
     stored_str = stored_code if isinstance(stored_code, str) else stored_code.decode()
 
     if stored_str != code:
+        # 错误：累加计数器（与验证码同生命周期）
+        await redis.incr(attempts_key)
+        # 设置计数器过期时间与验证码一致
+        ttl = await redis.ttl(code_key)
+        if ttl > 0:
+            await redis.expire(attempts_key, ttl)
         raise AppException(AuthError.SMS_CODE_INVALID)
 
-    # 验证通过，立即删除（一次性使用）
-    await redis.delete(code_key)
+    # 验证通过，立即删除验证码和计数器（一次性使用）
+    await redis.delete(code_key, attempts_key)
     return True
 
 

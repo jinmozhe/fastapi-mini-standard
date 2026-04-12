@@ -356,3 +356,27 @@ class WechatCompleteRequest(BaseModel):
         if not MOBILE_PATTERN.match(v):
             raise ValueError(MOBILE_ERROR_MESSAGE)
         return v
+
+
+# ==============================================================================
+# 密码管理模型
+# ==============================================================================
+
+
+class SetPasswordRequest(BaseModel):
+    """
+    设置/修改密码请求。
+    - 首次设置密码（无密码用户）：old_password 可不传
+    - 修改已有密码：old_password 必传
+    """
+
+    new_password: str = Field(
+        ...,
+        min_length=6,
+        max_length=128,
+        description="新密码 (最少 6 位)",
+    )
+    old_password: str | None = Field(
+        default=None,
+        description="旧密码（已有密码的用户必传）",
+    )

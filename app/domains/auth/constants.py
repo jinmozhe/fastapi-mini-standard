@@ -125,6 +125,16 @@ class AuthError(BaseErrorCode):
         "auth.phone_already_bound",
         "该手机号已绑定其他账号",
     )
+    ACCOUNT_DELETED = (
+        HTTP_403_FORBIDDEN,
+        "auth.account_deleted",
+        "该手机号关联的账号已被注销，如需恢复请联系客服",
+    )
+    UNBIND_LAST_METHOD = (
+        HTTP_403_FORBIDDEN,
+        "auth.unbind_last_method",
+        "无法解绑：这是您唯一的登录方式，请先设置密码或绑定其他账号",
+    )
 
 
 # ==============================================================================
@@ -150,3 +160,4 @@ class AuthMsg:
     WECHAT_UNBIND_SUCCESS = "微信解绑成功"
     WECHAT_SCAN_NEW_USER = "请绑定手机号完成注册"
     WECHAT_COMPLETE_SUCCESS = "注册完成"
+    SET_PASSWORD_SUCCESS = "密码设置成功"

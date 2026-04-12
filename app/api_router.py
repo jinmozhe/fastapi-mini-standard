@@ -21,6 +21,7 @@ from app.domains.user_levels.router import router as user_levels_router
 from app.domains.user_levels.admin_router import router as user_levels_admin
 from app.domains.user_wallets.router import wallet_admin, wallet_router
 from app.domains.products.router import product_admin, product_router
+from app.domains.media.router import media_admin
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -60,4 +61,7 @@ api_router.include_router(product_router, prefix="/products", tags=["C端商品�
 
 # 9. B端商品管理 (Products Admin)
 api_router.include_router(product_admin, prefix="/admin/products", tags=["B端商品管理"])
+
+# 10. B端媒体素材心 (Media Admin)
+api_router.include_router(media_admin, prefix="/admin/media", tags=["B端媒体素材库"])
 

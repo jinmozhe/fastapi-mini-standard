@@ -74,6 +74,11 @@ def create_app() -> FastAPI:
     # 挂载静态文件目录 (ReDoc 本地化资源)
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+    # 挂载业务上传的物理文件 (本地存储模式兜底)
+    import os
+    os.makedirs("uploads", exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
     # 自定义 ReDoc 路由 (极简本地化版)
     @app.get(f"{obscure_prefix}/redoc", include_in_schema=False)
     async def redoc_html():

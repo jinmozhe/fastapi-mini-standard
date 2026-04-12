@@ -42,6 +42,7 @@ from app.db.models.product import (
     ProductLevelPrice,
     ProductLevelCommission,
 )
+from app.db.models.media import MediaAsset
 
 # 3. 显式导出 (供 Alembic 识别)
 __all__ = [
@@ -78,4 +79,6 @@ __all__ = [
     "ProductSku",
     "ProductLevelPrice",
     "ProductLevelCommission",
+    # 媒体体系
+    "MediaAsset",
 ]

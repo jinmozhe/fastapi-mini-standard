@@ -33,6 +33,7 @@ dependencies = [
     "PyJWT[crypto]>=2.8.0", # JWT 签发与验签 (活跃维护, 替代 python-jose)
     "redis>=5.0.0", # Redis 异步客户端 (Refresh Token 存储)
     "httpx>=0.28.1",
+    "pillow>=12.2.0",
 ]
 
 # 开发与测试依赖

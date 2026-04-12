@@ -1042,3 +1042,47 @@ Created: <YYYY-MM-DD>
 
 > **本文件是项目唯一工程规范（Self-Contained Source of Truth）。**
 > **所有骨架代码已内嵌于本文件「基建骨架代码」章节，零外部依赖，新项目直接使用本文件即可。**
+
+
+---
+
+## 🆕 已落地业务领域扩展备忘录 (2026-04 更新)
+
+以下是基于本标准规范新增实现的领域模块，作为对"已实现的核心基础设施模块"章节的扩展补充：
+
+| 模块 | 文件/领域 | 职责 |
+|------|-----------|------|
+| 媒体素材 | domains/media/ | Pillow AOT 图片派生 (1080px _large / 400px _thumb) + LocalStorageProvider |
+| 商品体系 | domains/products/ | 5级价格引擎 + 3级分佣 + SPU/SKU + 分类树 + UPSERT 浏览足迹 |
+| 购物车 | domains/carts/ | OptionalCurrentUser + X-Device-Id 双轨身份 + 游客合并算法（叠加/过户） |
+| 收货地址 | domains/addresses/ | 行政编码双存 + is_default 互斥引擎 + AddressSnapshot 快照预留 |
+
+### 新增工程规范（重要！）
+
+#### 规范 E1: OptionalCurrentUser 双轨鉴权（购物车/游客接口专用）
+
+对于小程序等支持游客态的接口，必须使用 deps.py 中的 OptionalCurrentUser 而不是 CurrentUser，不得强制拦截登录：
+
+`python
+# app/api/deps.py 中已实现
+async def get_optional_current_user(...) -> User | None:
+    # Token 缺失/失效时静默返回 None，不抛 401
+    ...
+
+OptionalCurrentUser = Annotated[User | None, Depends(get_optional_current_user)]
+`
+
+接口中的身份优先级：user_id (Token) > nonymous_id (X-Device-Id Header)
+
+#### 规范 E2: 订单地址快照铁律（绝不存外键）
+
+订单下单时，禁止在订单表中保存 ddress_id 外键引用。   
+必须调用 AddressService.get_snapshot(user_id, address_id) 获取 AddressSnapshot 结构，  
+将地址全量数据序列化后存入订单表的 JSONB 字段。  
+这确保用户修改/删除收货地址不影响任何历史订单的显示。
+
+#### 规范 E3: 购物车绝不落地价格
+
+购物车表（cart_items）中绝对不存储任何价格字段。  
+每次 GET /carts/my 时，必须逐条通过 ProductService 的 5 级价格引擎实时计算当前展示价。  
+这杜绝了"历史价格越权"的价格雪崩场景。

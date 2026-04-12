@@ -16,6 +16,8 @@
 
 基于 FastAPI + Pydantic V2 + SQLAlchemy 2.0 (Async) + Alembic + PostgreSQL 构建的极简且**符合大厂中后台与双轨安全边界标准**的后端骨架项目。适合作为现代 Web/AI 原生应用、复杂电商 B/C 隔离系统的初始脚手架。
 
+> **当前版本进度**：脚手架基建已稳定，正在深度实现电商 C 端全链路业务域 (商品体系、购物车、地址、订单)。
+
 ---
 
 ## 📖 目录
@@ -95,9 +97,9 @@
 .
 ├── app/                              # 核心应用代码
 │   ├── main.py                       # 应用入口：工厂函数 + Lifespan 管理
-│   ├── api_router.py                 # 根路由聚合 (C端 auth/users + B端 admin)
+│   ├── api_router.py                 # 根路由聚合 (12 个路由域)
 │   ├── api/                          # 全局依赖层
-│   │   └── deps.py                   #   DB Session / C端 JWT / B端 JWT / RBAC 权限工厂
+│   │   └── deps.py                   #   DB Session / C端 JWT / B端 JWT / OptionalCurrentUser / RBAC 权限工厂
 │   ├── core/                         # 核心基础设施
 │   │   ├── config.py                 #   全局配置 (pydantic-settings, .env)
 │   │   ├── error_code.py             #   错误码枚举基类 + 系统级错误
@@ -115,41 +117,41 @@
 │   │   └── wechat.py                 #   微信工具 (小程序code2session + 开放平台OAuth + AES解密)
 │   ├── db/                           # 数据库层
 │   │   ├── session.py                #   AsyncEngine + AsyncSession 工厂
-│   │   ├── models/                   #   ORM 模型
-│   │   │   ├── base.py               #     基类 (UUIDModel / Mixin 组件)
-│   │   │   ├── user.py               #     C端用户核心账号 (密码可选)
-│   │   │   ├── user_social.py        #     三方登录绑定 (platform+openid唯一约束)
-│   │   │   ├── user_level.py         #     会员等级体系 (等级规则 + 用户档案 + 升级记录)
+│   │   ├── models/                   #   ORM 模型 (集中管理，Alembic 自动发现)
+│   │   │   ├── base.py               #     基类 (UUIDModel / SoftDeleteMixin)
+│   │   │   ├── user.py               #     C端用户核心账号
+│   │   │   ├── user_social.py        #     三方登录绑定
+│   │   │   ├── user_level.py         #     会员等级体系
+│   │   │   ├── user_wallet.py        #     用户钱包 (余额/积分/流水)
 │   │   │   ├── sms_log.py            #     短信发送审计日志
-│   │   │   ├── admin.py              #     B端 RBAC 5表 (SysAdmin/SysRole/SysPermission)
-│   │   │   └── log.py                #     安全审计日志 (LoginLog + AuditLog)
+│   │   │   ├── admin.py              #     B端 RBAC 5表
+│   │   │   ├── log.py                #     安全审计日志
+│   │   │   ├── product.py            #     商品体系 (6表：分类/商品/SKU/规格/等级价/分佣)
+│   │   │   ├── media.py              #     媒体素材 (media_assets)
+│   │   │   ├── product_view.py       #     商品浏览足迹 (product_views)
+│   │   │   ├── cart.py               #     购物车 (cart_items，双轨身份)
+│   │   │   └── address.py            #     收货地址 (addresses，含行政编码)
 │   │   └── repositories/
 │   │       └── base.py               #   泛型 CRUD Repository 基类
 │   ├── domains/                      # 业务领域 (Bounded Contexts)
 │   │   ├── auth/                     #   C端认证领域 (多渠道登录/注册/Token/社交绑定)
-│   │   │   ├── router.py / service.py / schemas.py / constants.py / repository.py
 │   │   ├── users/                    #   C端用户领域 (查询/更新/注销)
-│   │   │   ├── router.py / service.py / repository.py / schemas.py
-│   │   │   ├── dependencies.py       #     DI 依赖链组装
-│   │   │   └── constants.py          #     错误码 + 成功文案
 │   │   ├── user_levels/              #   会员等级领域 (等级规则/升降级/分佣奖励)
-│   │   │   ├── router.py / service.py / repository.py / schemas.py / constants.py
-│   │   └── admin/                    #   B端管理员领域 (登录/权限树/RBAC)
-│   │       ├── router.py / service.py / repository.py / schemas.py / constants.py
-│   ├── services/                     # 跨领域业务编排 (Use Cases)
+│   │   ├── user_wallets/             #   用户钱包领域 (余额签到/积分/流水/B端管控)
+│   │   ├── admin/                    #   B端管理员领域 (登录/权限树/RBAC)
+│   │   ├── products/                 #   商品领域 (分类树/SPU/SKU/5级价格/3级分佣/足迹)
+│   │   ├── media/                    #   媒体素材领域 (图片上传/压缩/LocalStorage)
+│   │   ├── carts/                    #   购物车领域 (双轨挂车/游客合并/实时计价)
+│   │   └── addresses/                #   收货地址领域 (默认互斥/行政编码/快照预留)
 │   └── utils/
 │       └── masking.py                # PII 数据脱敏工具
 ├── tests/                            # Pytest 测试套件
-│   ├── conftest.py                   #   全局 Fixtures (异步 DB + HTTP Client)
-│   ├── unit/                         #   单元测试
-│   └── integration/                  #   集成测试
 ├── alembic/                          # 数据库迁移
 │   └── env.py                        #   同步迁移配置 (psycopg3, Windows 兼容)
 ├── scripts/                          # 运维脚本
 │   └── seed_admin.py                 #   超级管理员初始化种子脚本 (幂等)
 ├── docs/                             # 项目文档
 ├── pyproject.toml                    # 项目配置 (依赖 + 工具链)
-├── requirements.txt                  # 依赖清单 (与 pyproject.toml 对齐)
 ├── .env.example                      # 环境变量模板
 ├── .importlinter                     # 架构约束规则
 ├── Dockerfile                        # Docker 构建
@@ -177,13 +179,6 @@
 | 刷新令牌 | `POST` | `/api/v1/auth/refresh` | Token Rotation：旧 Token RENAME 钓鱼，签发新对 |
 | 用户登出 | `POST` | `/api/v1/auth/logout` | 拔除关联 Session 族谱的所有 Token |
 
-- **多渠道统一身份**: 手机号作为唯一身份锚点，支持密码、短信验证码、微信小程序、微信网页扫码四种登录方式。
-- **Refresh Token 洗劫防御**: Redis 原生 `RENAME` 拦截，识别窃用并发，追剿整族 Token。
-- **验证码暴力破解保护**: 5 次错误后自动销毁验证码 + 60 秒发送冷却 + 接口限流。
-- **社交绑定冲突检测**: 绑定前检查 openid 是否已被其他用户占用，解绑前确保至少保留一种登录方式。
-- **人机安全掩码**: `httpx` 轻量验证码护盾，`CAPTCHA_ENABLE` 热插拔逃生舱，登录失败统一返回防枚举。
-- **短信审计铁账本**: `sms_logs` 表永久记录每条短信的发送状态、IP、模板、流水号，满足合规审计要求。
-
 ### C端用户领域 (Users)
 
 | 接口 | 方法 | 路径 | 说明 |
@@ -201,28 +196,94 @@
 | 管理员登出 | `POST` | `/api/v1/admin/logout` | 销毁 B端会话族谱 |
 | 获取管理员信息 | `GET` | `/api/v1/admin/me` | 返回角色列表 + 权限码数组 (供 React 动态渲染菜单) |
 
-- **B/C 端 Token 双轨隔离**: JWT `aud=backend` 标识 + Redis Key 前缀隔离，两端凭证无法互通。
-- **RBAC 精细权限**: `require_permission("order:refund")` 依赖工厂函数，一行代码守护高危接口。
-- **AuditLog 全量追踪**: `AuditLogMiddleware` 自动拦截 `/admin/` 下所有请求（含 GET），旁路落库，请求体自动脱敏。
-- **种子脚本**: `scripts/seed_admin.py` 一键初始化超级管理员 + 17 个基础权限点 + SUPER_ADMIN 角色（幂等）。
+### C端会员等级与钱包领域 (User Levels / Wallets)
 
-### 数据模型
+| 接口 | 方法 | 路径 | 说明 |
+|------|------|------|------|
+| 查询等级体系 | `GET` | `/api/v1/user_levels/` | C端查看等级规则列表与权益对比 |
+| 我的余额 | `GET` | `/api/v1/user_wallets/balance` | 实时余额 + 积分 |
+| 余额流水 | `GET` | `/api/v1/user_wallets/balance/log` | 余额变动记录分页 |
+| 积分流水 | `GET` | `/api/v1/user_wallets/points/log` | 积分变动记录分页 |
+| B端充值/扣款 | `POST` | `/api/v1/admin/user_wallets/adjust` | 管理员手动调整余额/积分（RBAC 鉴权） |
 
-| 表名 | 所属端 | 用途 | 关键字段 |
+### C/B端商品体系 (Products)
+
+| 接口 | 方法 | 路径 | 说明 |
+|------|------|------|------|
+| 分类树 | `GET` | `/api/v1/products/categories` | 三级嵌套树形结构 |
+| 商品列表 | `GET` | `/api/v1/products/` | 支持分类/类型/关键词筛选 |
+| 商品详情 | `GET` | `/api/v1/products/{id}` | 含 SKU / 规格 / 实时会员价 |
+| 上报浏览足迹 | `POST` | `/api/v1/products/{id}/view` | BackgroundTask 异步静默埋点 |
+| 我的足迹 | `GET` | `/api/v1/products/my-views/list` | 防重历史时间线 |
+| B端商品 CRUD | `POST/PATCH/DELETE` | `/api/v1/admin/products/` | 商品全生命周期管理 |
+| B端 SKU/规格管理 | `PUT` | `/api/v1/admin/products/{id}/skus` | 批量替换 SKU / 规格模板 |
+| B端等级价管理 | `PUT` | `/api/v1/admin/products/{id}/level-prices` | 多层级固定价设置 |
+| B端独立分佣 | `PUT` | `/api/v1/admin/products/{id}/level-commissions` | SKU 级/商品级分佣规则 |
+
+### B端媒体素材库 (Media)
+
+| 接口 | 方法 | 路径 | 说明 |
+|------|------|------|------|
+| 上传图片 | `POST` | `/api/v1/admin/media/upload` | AOT 派生策略：自动生成 `_large` (1080px) 和 `_thumb` (400px)，保留原图 |
+| 素材列表 | `GET` | `/api/v1/admin/media/` | 素材库查询（仅管理员） |
+| 删除素材 | `DELETE` | `/api/v1/admin/media/{id}` | 物理删除文件 + 数据库记录 |
+
+> 图片存储：`LocalStorageProvider` 挂载至 `uploads/` 目录，通过 `StaticFiles` 暴露。数据库仅存相对路径 `file_key`，URL 由 Service 层动态拼接（未来迁移 OSS/S3 零改动）。
+
+### C端购物车 (Carts)
+
+| 接口 | 方法 | 路径 | 说明 |
+|------|------|------|------|
+| 加入购物车 | `POST` | `/api/v1/carts/` | 双轨（登录用户/游客 `X-Device-Id`），自动合并同款数量 |
+| 展开购物车 | `GET` | `/api/v1/carts/my` | 含实时价格探测、is_valid 下架检测、库存预警 |
+| 调整条目 | `PATCH` | `/api/v1/carts/{id}` | 修改数量或勾选状态 |
+| 批量删除 | `DELETE` | `/api/v1/carts/` | 按 ID 数组移出 |
+| 游客车并网 | `POST` | `/api/v1/carts/merge` | 已登录后触发：将匿名设备车数据并入实名账号（含叠加/过户算法） |
+
+### C端收货地址 (Addresses)
+
+| 接口 | 方法 | 路径 | 说明 |
+|------|------|------|------|
+| 新建地址 | `POST` | `/api/v1/addresses/` | 首条自动设为默认，含 20 条容量上限 |
+| 地址列表 | `GET` | `/api/v1/addresses/` | 默认地址排第一 |
+| 默认地址 | `GET` | `/api/v1/addresses/default` | 结算页快捷预填充 |
+| 修改地址 | `PUT` | `/api/v1/addresses/{id}` | 全量修改，可同步切换默认 |
+| 设置默认 | `PATCH` | `/api/v1/addresses/{id}/set-default` | 互斥引擎：原子事务保证唯一默认 |
+| 删除地址 | `DELETE` | `/api/v1/addresses/{id}` | 物理删除；若删的是默认，自动晋升最早创建的地址 |
+
+---
+
+### 数据模型一览
+
+| 表名 | 所属端 | 用途 | 关键设计 |
 |------|--------|------|---------|
-| `users` | C端 | 买家核心账号 | phone_code, mobile, hashed_password(可选), nickname, avatar, is_active |
-| `user_socials` | C端 | 三方绑定 (N:1) | platform, openid, unionid, session_key (唯一约束: platform+openid) |
-| `user_level_rules` | C端 | 会员等级规则 | level_code, level_name, upgrade_condition_type, reward_amount |
-| `user_level_profiles` | C端 | 用户等级档案 (1:1) | current_level, total_spend, total_invite_number, inviter_id |
-| `user_level_change_logs` | C端 | 等级变更日志 | user_id, from_level, to_level, change_type, trigger_type |
-| `sms_logs` | C端 | 短信发送审计 | phone_code, mobile, sms_type, status, provider, ip_address |
-| `sys_admins` | B端 | 管理员账号 | username, hashed_password, real_name, is_active |
-| `sys_roles` | B端 | 角色 | code, name, is_active |
-| `sys_permissions` | B端 | 权限点 | code, name, type (menu/button/api) |
-| `sys_admin_role` | B端 | 管理员-角色关联 (M:N) | admin_id, role_id |
-| `sys_role_permission` | B端 | 角色-权限关联 (M:N) | role_id, permission_id |
-| `sys_login_logs` | 双端 | 登录日志 (C端+B端) | actor_type, actor_id, ip, status, reason |
-| `sys_audit_logs` | B端 | 管理员操作审计 | actor_id, module, action, endpoint, request_payload (JSONB) |
+| `users` | C端 | 买家核心账号 | phone_code+mobile 唯一，密码可选 |
+| `user_socials` | C端 | 三方绑定 | platform+openid 唯一约束 |
+| `user_level_rules` | C端 | 会员等级规则 | JSONB 升级条件，分佣奖励配置 |
+| `user_level_profiles` | C端 | 用户等级档案 | 当前等级、累计消费、推荐关系 |
+| `user_level_change_logs` | C端 | 等级变更日志 | 全量操作留痕 |
+| `user_wallets` | C端 | 余额与积分账户 | DECIMAL(15,2)，双账户隔离 |
+| `user_balance_logs` | C端 | 余额流水 | 不可变流水记录 |
+| `user_point_logs` | C端 | 积分流水 | 不可变流水记录 |
+| `sms_logs` | C端 | 短信审计 | IP+模板+流水号永久留存 |
+| `sys_admins` | B端 | 管理员账号 | 独立于 users 表物理隔离 |
+| `sys_roles` | B端 | 角色 | RBAC 五表结构 |
+| `sys_permissions` | B端 | 权限点 | menu/button/api 三类 |
+| `sys_admin_role` | B端 | 管理员-角色关联 | M:N |
+| `sys_role_permission` | B端 | 角色-权限关联 | M:N |
+| `sys_login_logs` | 双端 | 登录日志 | C端+B端所有登录事件 |
+| `sys_audit_logs` | B端 | 管理员操作审计 | JSONB 请求体自动脱敏 |
+| `categories` | C/B端 | 商品分类 | 三级限制，JSONB 等级折扣/分佣规则 |
+| `products` | C/B端 | 商品 SPU | virtual/physical 双类型，软删除 |
+| `product_categories` | C/B端 | 商品-分类关联 | M:N |
+| `product_specs` | C/B端 | 规格模板 | 颜色/尺寸等规格名+候选值 |
+| `product_skus` | C/B端 | SKU 变体 | 规格组合+独立售价+库存 |
+| `product_level_prices` | C/B端 | 等级固定价 | SKU 级/商品级优先级 |
+| `product_level_commissions` | C/B端 | 独立分佣规则 | 直推/间推/其它三档固定金额 |
+| `media_assets` | B端 | 媒体素材 | file_key 相对路径，URL 动态拼接 |
+| `product_views` | C端 | 商品浏览足迹 | user_id+product_id 联合唯一，UPSERT 防重 |
+| `cart_items` | C端 | 购物车 | user_id/anonymous_id 双轨身份 |
+| `addresses` | C端 | 收货地址 | 省市区文本+行政编码双存，is_default 互斥 |
 
 > **架构红线**: C端 (`users`) 与 B端 (`sys_admins`) 物理隔离，严禁混表。所有模型继承自 `UUIDModel` (UUID v7 主键 + UTC 时间戳)。
 
@@ -452,18 +513,28 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ---
 
-## 📝 未来 C端业务侧实现清单 (TODO Backlog)
+## 📝 C端业务实现进度
 
-为彻底达成大厂商业系统交付标准，基于目前已经牢不可破的安全基建，面向普通消费者（C端侧）未来仍需横拓的业务版图如下：
+### 已完成 ✅
 
-- [x] ~~**多渠道聚合登录体系：** 建立手机号锚点 + 短信验证码 + 微信小程序 + 微信网页扫码的统一认证架构。~~
-- [x] ~~**社交绑定/解绑管理：** 已登录用户可绑定/解绑微信，含冲突检测和安全检查。~~
-- [x] ~~**会员等级与分销体系 (`user_levels`)：** 多层级分佣 + 升降级规则 + 推荐关系绑定 + 等级变更日志。~~
-- [ ] **修改手机号流程：** 旧手机验证码 + 新手机验证码双重验证。
-- [ ] **unionid 跨平台自动合流：** 微信同一用户在 mini/mp/web 的 openid 不同但 unionid 相同，可自动识别关联。
-- [ ] **腾讯云 SMS 正式签名实现：** `sms.py` 中 TC3-HMAC-SHA256 签名算法上线前需补全。
-- [ ] **活体与二次验证风控：** 对极其敏感行为进行 OTP 短信、设备信誉机制等二次验签挂载闭环。
-- [ ] **单元自动化覆盖：** 采用 PyTest 与模拟高并发压测，完成防暴撞击与 Token 窃取的全套安全防线。
+- [x] **多渠道聚合登录体系** — 手机号锚点 + 短信验证码 + 微信小程序 + 微信网页扫码。
+- [x] **社交绑定/解绑管理** — 含冲突检测和安全检查。
+- [x] **会员等级与分销体系** — 多层级分佣 + 升降级规则 + 推荐关系 + 变更日志。
+- [x] **用户钱包** — 余额/积分双账户 + 流水记录 + B端调控管理接口。
+- [x] **商品体系** — 三级分类树 + SPU/SKU + 5级价格引擎 + 3级分佣引擎。
+- [x] **媒体素材管理** — LocalStorageProvider + AOT 多规格图片派生 + 素材库管理。
+- [x] **商品浏览足迹** — 登录用户 UPSERT 去重足迹 + 50 条自动修剪 + 时间线展示。
+- [x] **购物车** — 双轨（实名+游客 `X-Device-Id`）+ 合并算法 + 实时 5 级价格探测 + is_valid 下架检测。
+- [x] **收货地址** — 省市区行政编码双存 + 默认地址互斥引擎 + 智能晋升 + `AddressSnapshot` 快照预留。
+
+### 进行中 / 待开发 🚧
+
+- [ ] **订单结算域 (Checkout → Order)** — 基于购物车勾选 + 地址快照 + 库存锁定的下单流。
+- [ ] **支付域** — 微信支付 / 余额支付接入，支付回调与状态机管理。
+- [ ] **物流域** — 顺丰/菜鸟行政编码对接，物流轨迹追踪。
+- [ ] **修改手机号流程** — 旧手机+新手机双重验证码验证。
+- [ ] **腾讯云 SMS 正式签名** — TC3-HMAC-SHA256 算法上线前需补全。
+- [ ] **单元自动化覆盖** — PyTest + 安全防线压测。
 
 ---
 

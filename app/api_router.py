@@ -19,6 +19,7 @@ from app.domains.users.router import router as users_router
 from app.domains.admin.router import router as admin_router
 from app.domains.user_levels.router import router as user_levels_router
 from app.domains.user_levels.admin_router import router as user_levels_admin
+from app.domains.user_wallets.router import wallet_admin, wallet_router
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -46,4 +47,10 @@ api_router.include_router(admin_router, prefix="/admin", tags=["B端管理员"])
 # 5. B端会员等级管理模块 (User Levels Domain - B端管理)
 # 后台管理员维护等级配置、人工干预用户等级
 api_router.include_router(user_levels_admin, prefix="/admin/user_levels", tags=["B端会员等级管理"])
+
+# 6. C端资金钱包模块 (User Wallets)
+api_router.include_router(wallet_router, prefix="/user_wallets", tags=["C端我的钱包"])
+
+# 7. B端后台资金监管体系 (User Wallets Admin)
+api_router.include_router(wallet_admin, prefix="/admin/user_wallets", tags=["B端资金监管与干预"])
 

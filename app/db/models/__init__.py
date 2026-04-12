@@ -31,6 +31,7 @@ from app.db.models.admin import SysAdmin, SysRole, SysPermission
 from app.db.models.log import LoginLog, AuditLog
 from app.db.models.user_level import UserLevel, UserLevelProfile, UserLevelRecord
 from app.db.models.user_social import UserSocial
+from app.db.models.user_wallet import UserBalanceLog, UserPointLog, UserWallet
 from app.db.models.sms_log import SmsLog
 
 # 3. 显式导出 (供 Alembic 识别)
@@ -45,14 +46,19 @@ __all__ = [
     "User",
     "SysAdmin",
     "SysRole",
-    "SysPermission",
+    "SysPermission",    # 系统日志模型
     "LoginLog",
     "AuditLog",
+    # 消息推送模型
+    "SmsLog",
+    # 资金钱包模型
+    "UserWallet",
+    "UserBalanceLog",
+    "UserPointLog",
     # 用户等级体系
     "UserLevel",
     "UserLevelProfile",
     "UserLevelRecord",
-    # 社交绑定与短信日志
+    # 社交绑定
     "UserSocial",
-    "SmsLog",
 ]

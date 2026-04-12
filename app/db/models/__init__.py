@@ -33,6 +33,15 @@ from app.db.models.user_level import UserLevel, UserLevelProfile, UserLevelRecor
 from app.db.models.user_social import UserSocial
 from app.db.models.user_wallet import UserBalanceLog, UserPointLog, UserWallet
 from app.db.models.sms_log import SmsLog
+from app.db.models.product import (
+    Category,
+    Product,
+    ProductCategory,
+    ProductSpec,
+    ProductSku,
+    ProductLevelPrice,
+    ProductLevelCommission,
+)
 
 # 3. 显式导出 (供 Alembic 识别)
 __all__ = [
@@ -61,4 +70,12 @@ __all__ = [
     "UserLevelRecord",
     # 社交绑定
     "UserSocial",
+    # 商品体系
+    "Category",
+    "Product",
+    "ProductCategory",
+    "ProductSpec",
+    "ProductSku",
+    "ProductLevelPrice",
+    "ProductLevelCommission",
 ]

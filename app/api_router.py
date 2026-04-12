@@ -20,6 +20,7 @@ from app.domains.admin.router import router as admin_router
 from app.domains.user_levels.router import router as user_levels_router
 from app.domains.user_levels.admin_router import router as user_levels_admin
 from app.domains.user_wallets.router import wallet_admin, wallet_router
+from app.domains.products.router import product_admin, product_router
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -53,4 +54,10 @@ api_router.include_router(wallet_router, prefix="/user_wallets", tags=["C端我�
 
 # 7. B端后台资金监管体系 (User Wallets Admin)
 api_router.include_router(wallet_admin, prefix="/admin/user_wallets", tags=["B端资金监管与干预"])
+
+# 8. C端商品浏览 (Products)
+api_router.include_router(product_router, prefix="/products", tags=["C端商品浏览"])
+
+# 9. B端商品管理 (Products Admin)
+api_router.include_router(product_admin, prefix="/admin/products", tags=["B端商品管理"])
 

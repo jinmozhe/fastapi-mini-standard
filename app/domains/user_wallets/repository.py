@@ -13,21 +13,18 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.user_wallet import UserBalanceLog, UserPointLog, UserWallet
-from app.db.repositories.base import BaseRepository
 
 
-class UserWalletRepository(BaseRepository[UserWallet]):
+class UserWalletRepository:
     def __init__(self, session: AsyncSession):
-        super().__init__(UserWallet, session)
+        self.session = session
+        self.model = UserWallet
 
     async def get_by_user_id(self, user_id: UUID) -> UserWallet | None:
         """
-        根据 user_id 查询钱包。如果已经软删除也会过滤掉（虽然通常不软删除钱包）。
+        根据 user_id 查询钱包。
         """
-        stmt = select(self.model).where(
-            self.model.user_id == user_id, 
-            self.model.is_deleted == False
-        )
+        stmt = select(self.model).where(self.model.user_id == user_id)
         return await self.session.scalar(stmt)
 
     async def update_balance_with_optimistic_lock(
@@ -39,10 +36,6 @@ class UserWalletRepository(BaseRepository[UserWallet]):
     ) -> int:
         """
         乐观锁更新资金余额。
-        :param wallet_id: 钱包ID
-        :param current_version: 当前的乐观锁版本
-        :param amount_delta: 变动金额(可正可负)
-        :param new_version: 目标的新乐观锁版本
         :return: 影响的行数 (1则成功，0则失败代表发生并发冲突)
         """
         stmt = (
@@ -84,11 +77,14 @@ class UserWalletRepository(BaseRepository[UserWallet]):
         return result.rowcount
 
 
-class UserBalanceLogRepository(BaseRepository[UserBalanceLog]):
+class UserBalanceLogRepository:
     def __init__(self, session: AsyncSession):
-        super().__init__(UserBalanceLog, session)
+        self.session = session
+        self.model = UserBalanceLog
 
 
-class UserPointLogRepository(BaseRepository[UserPointLog]):
+class UserPointLogRepository:
     def __init__(self, session: AsyncSession):
-        super().__init__(UserPointLog, session)
+        self.session = session
+        self.model = UserPointLog
+

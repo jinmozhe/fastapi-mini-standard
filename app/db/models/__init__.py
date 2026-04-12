@@ -30,11 +30,8 @@ from app.db.models.user import User
 from app.db.models.admin import SysAdmin, SysRole, SysPermission
 from app.db.models.log import LoginLog, AuditLog
 from app.db.models.user_level import UserLevel, UserLevelProfile, UserLevelRecord
-
-# 未来新增模型示例:
-# from app.db.models.user_profile import UserProfile
-# from app.db.models.user_social import UserSocial
-# from app.db.models.log import LoginLog, OperationLog
+from app.db.models.user_social import UserSocial
+from app.db.models.sms_log import SmsLog
 
 # 3. 显式导出 (供 Alembic 识别)
 __all__ = [
@@ -55,4 +52,7 @@ __all__ = [
     "UserLevel",
     "UserLevelProfile",
     "UserLevelRecord",
+    # 社交绑定与短信日志
+    "UserSocial",
+    "SmsLog",
 ]

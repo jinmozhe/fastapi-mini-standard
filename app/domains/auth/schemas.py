@@ -125,3 +125,120 @@ class RefreshRequest(BaseModel):
     """
 
     refresh_token: str = Field(..., description="有效的刷新令牌")
+
+
+# ==============================================================================
+# 多渠道登录请求模型
+# ==============================================================================
+
+
+class SmsCodeRequest(BaseModel):
+    """
+    发送短信验证码请求。
+    """
+
+    phone_code: str = Field(
+        default="+86",
+        description="手机区号 (默认 +86)",
+        examples=["+86"],
+    )
+    mobile: str = Field(
+        ...,
+        description="手机号码 (纯数字)",
+        examples=["13800000000"],
+    )
+
+    @field_validator("phone_code", mode="before")
+    @classmethod
+    def default_phone_code(cls, v: str | None) -> str:
+        if not v:
+            return "+86"
+        return v
+
+    @field_validator("phone_code")
+    @classmethod
+    def validate_phone_code(cls, v: str) -> str:
+        if not PHONE_CODE_PATTERN.match(v):
+            raise ValueError(PHONE_CODE_ERROR_MESSAGE)
+        return v
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        if not MOBILE_PATTERN.match(v):
+            raise ValueError(MOBILE_ERROR_MESSAGE)
+        return v
+
+
+class SmsLoginRequest(BaseModel):
+    """
+    短信验证码登录请求 (注册即登录)。
+    如果该手机号尚未注册，系统将自动创建账号。
+    """
+
+    phone_code: str = Field(
+        default="+86",
+        description="手机区号 (默认 +86)",
+        examples=["+86"],
+    )
+    mobile: str = Field(
+        ...,
+        description="手机号码 (纯数字)",
+        examples=["13800000000"],
+    )
+    code: str = Field(
+        ...,
+        min_length=4,
+        max_length=8,
+        description="短信验证码",
+        examples=["888888"],
+    )
+    inviter_id: str | None = Field(
+        default=None,
+        description="推荐人用户 ID (可选，用于分销关系绑定)",
+    )
+
+    @field_validator("phone_code", mode="before")
+    @classmethod
+    def default_phone_code(cls, v: str | None) -> str:
+        if not v:
+            return "+86"
+        return v
+
+    @field_validator("phone_code")
+    @classmethod
+    def validate_phone_code(cls, v: str) -> str:
+        if not PHONE_CODE_PATTERN.match(v):
+            raise ValueError(PHONE_CODE_ERROR_MESSAGE)
+        return v
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        if not MOBILE_PATTERN.match(v):
+            raise ValueError(MOBILE_ERROR_MESSAGE)
+        return v
+
+
+class WechatLoginRequest(BaseModel):
+    """
+    微信小程序授权登录请求。
+    前端调用 wx.login() 获取 code，调用 wx.getPhoneNumber() 获取加密手机号。
+    """
+
+    js_code: str = Field(
+        ...,
+        description="wx.login() 返回的临时登录凭证 code",
+    )
+    encrypted_data: str = Field(
+        ...,
+        description="wx.getPhoneNumber() 返回的加密数据",
+    )
+    iv: str = Field(
+        ...,
+        description="加密算法初始向量",
+    )
+    inviter_id: str | None = Field(
+        default=None,
+        description="推荐人用户 ID (可选，用于分销关系绑定)",
+    )

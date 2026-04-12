@@ -16,6 +16,8 @@ from starlette.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
+    HTTP_429_TOO_MANY_REQUESTS,
+    HTTP_502_BAD_GATEWAY,
 )
 
 from app.core.error_code import BaseErrorCode
@@ -66,6 +68,42 @@ class AuthError(BaseErrorCode):
         "安全警告：检测到异地会话异常或令牌盗用，为保护您的账户，该设备及相关会话已被强制下线，请重新登录。",
     )
 
+    # ---------- 短信验证码相关 ----------
+    SMS_SEND_TOO_FREQUENT = (
+        HTTP_429_TOO_MANY_REQUESTS,
+        "auth.sms_send_too_frequent",
+        "发送过于频繁，请稍后再试",
+    )
+    SMS_CODE_INVALID = (
+        HTTP_403_FORBIDDEN,
+        "auth.sms_code_invalid",
+        "验证码错误或已过期",
+    )
+    SMS_SEND_FAILED = (
+        HTTP_502_BAD_GATEWAY,
+        "auth.sms_send_failed",
+        "短信发送失败，请稍后重试",
+    )
+
+    # ---------- 微信授权相关 ----------
+    WECHAT_AUTH_FAILED = (
+        HTTP_502_BAD_GATEWAY,
+        "auth.wechat_auth_failed",
+        "微信授权失败，请重试",
+    )
+    WECHAT_DECRYPT_FAILED = (
+        HTTP_403_FORBIDDEN,
+        "auth.wechat_decrypt_failed",
+        "手机号解密失败，请重新授权",
+    )
+
+    # ---------- 密码未设置 ----------
+    PASSWORD_NOT_SET = (
+        HTTP_403_FORBIDDEN,
+        "auth.password_not_set",
+        "您尚未设置密码，请使用短信验证码或微信登录",
+    )
+
 
 # ==============================================================================
 # 2. 成功提示语 (Success Messages)
@@ -83,3 +121,6 @@ class AuthMsg:
     LOGOUT_SUCCESS = "已安全退出"
     REFRESH_SUCCESS = "令牌刷新成功"
     PWD_RESET_SUCCESS = "密码重置成功"
+    SMS_SEND_SUCCESS = "验证码已发送"
+    SMS_LOGIN_SUCCESS = "登录成功"
+    WECHAT_LOGIN_SUCCESS = "微信登录成功"

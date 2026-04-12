@@ -66,8 +66,9 @@ class User(UUIDModel, SoftDeleteMixin):
     )
 
     # 密码：存储 Argon2id 或 Bcrypt 哈希值
-    hashed_password: Mapped[str] = mapped_column(
-        String(255), nullable=False, comment="密码哈希值"
+    # 小程序/短信验证码注册的用户可为空，后续可在个人设置中补设
+    hashed_password: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, comment="密码哈希值 (短信/小程序用户可为空)"
     )
 
     # --------------------------------------------------------------------------

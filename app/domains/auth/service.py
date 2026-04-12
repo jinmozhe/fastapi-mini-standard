@@ -3,17 +3,19 @@ File: app/domains/auth/service.py
 Description: 认证领域服务 (Service)
 
 本模块封装认证核心业务逻辑：
-1. 登录校验: 验证手机号与密码，签发双 Token。
-2. 刷新令牌: 验证 Redis 中的 Refresh Token，执行旋转策略 (Rotation)。
-3. 用户登出: 销毁 Refresh Token。
-4. 依赖注入: 依赖 UserRepository (查用户) 和 Redis (存 Token)。
+1. 密码登录: 验证手机号与密码，签发双 Token。
+2. 短信验证码登录: 验证码校验 → 查手机号 → 不存在则自动注册 → 签发 Token。
+3. 微信小程序登录: code2session → 解密手机号 → 合流用户 → 签发 Token。
+4. 刷新令牌: 验证 Redis 中的 Refresh Token，执行旋转策略 (Rotation)。
+5. 用户登出: 销毁 Refresh Token。
 
 Author: jinmozhe
 Created: 2025-12-05
-Updated: 2026-01-15 (v2.1: Adapt to new Exception & ErrorCode standards)
+Updated: 2026-04-12 (v3.0: 多渠道认证体系)
 """
 
 import secrets
+import uuid as uuid_mod
 from datetime import timedelta
 
 from redis.asyncio import Redis
@@ -25,26 +27,47 @@ from app.core.error_code import SystemErrorCode
 from app.core.exceptions import AppException
 from app.core.logging import logger
 from app.core.captcha import verify_captcha_async
+from app.core.sms import verify_sms_code
+from app.core.wechat import code2session, decrypt_phone_number
 from app.db.models.log import LoginLog
+from app.db.models.user import User
+from app.db.models.user_social import UserSocial
 from app.core.security import (
     create_access_token,
     get_password_hash_async,
     verify_password_async,
 )
-from app.db.models.user import User
 from app.domains.auth.constants import AuthError
-from app.domains.auth.schemas import LoginRequest, RegisterRequest, Token
+from app.domains.auth.repository import UserSocialRepository
+from app.domains.auth.schemas import (
+    LoginRequest,
+    RegisterRequest,
+    SmsLoginRequest,
+    Token,
+    WechatLoginRequest,
+)
 from app.domains.users.repository import UserRepository
 
 
 class AuthService:
     """
     认证服务类。
+
+    支持三种登录渠道：
+    - 手机号 + 密码（传统登录）
+    - 手机号 + 短信验证码（注册即登录）
+    - 微信小程序授权（注册即登录 + 社交绑定）
     """
 
-    def __init__(self, user_repo: UserRepository, redis: Redis):
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        redis: Redis,
+        social_repo: UserSocialRepository | None = None,
+    ):
         self.user_repo = user_repo
         self.redis = redis
+        self.social_repo = social_repo
 
     async def register(self, reg_data: RegisterRequest) -> Token:
         """
@@ -124,7 +147,12 @@ class AuthService:
 
             user_id_for_log = str(user.id)
 
-            # 2. 校验密码
+            # 2. 检查用户是否设置了密码（小程序/SMS 注册的用户可能没有密码）
+            if not user.hashed_password:
+                reason = "尚未设置密码"
+                raise AppException(AuthError.PASSWORD_NOT_SET)
+
+            # 3. 校验密码
             if not await verify_password_async(login_data.password, user.hashed_password):
                 reason = "账号或密码错误"
                 raise AppException(AuthError.INVALID_CREDENTIALS)
@@ -172,6 +200,239 @@ class AuthService:
                 status=status,
                 reason=reason,
             ).info("Login DB attempt recorded")
+
+    # ==========================================================================
+    # 短信验证码登录 (注册即登录)
+    # ==========================================================================
+
+    async def sms_login(
+        self,
+        data: SmsLoginRequest,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> Token:
+        """
+        短信验证码登录（注册即登录）。
+
+        流程：
+        1. 验证短信验证码 (从 Redis 比对并销毁)
+        2. 查库: 手机号是否已存在
+        3. 不存在 → 自动创建 User (hashed_password=None)
+        4. 如果有 inviter_id → 绑定推荐关系
+        5. 签发双 Token
+        """
+        # 1. 验证短信验证码
+        await verify_sms_code(self.redis, data.phone_code, data.mobile, data.code)
+
+        # 2. 查库
+        user = await self.user_repo.get_by_mobile(data.phone_code, data.mobile)
+        is_new = False
+
+        if not user:
+            # 3. 自动注册 (无密码用户)
+            user = User(
+                phone_code=data.phone_code,
+                mobile=data.mobile,
+                hashed_password=None,
+            )
+            self.user_repo.session.add(user)
+            await self.user_repo.session.flush()
+            is_new = True
+
+            logger.bind(
+                user_id=str(user.id), mobile=data.mobile
+            ).info("用户通过短信验证码自动注册")
+
+        # 检查用户状态
+        if not user.is_active:
+            raise AppException(AuthError.ACCOUNT_LOCKED)
+
+        # 4. 绑定推荐关系 (仅新注册用户)
+        if is_new and data.inviter_id:
+            await self._bind_inviter(user.id, data.inviter_id)
+
+        # 5. 记录登录日志
+        login_log = LoginLog(
+            actor_type="user",
+            actor_id=str(user.id),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            status=True,
+            reason="短信验证码登录成功",
+        )
+        self.user_repo.session.add(login_log)
+        await self.user_repo.session.commit()
+
+        # 6. 签发 Token
+        return await self._create_tokens(user_id=str(user.id))
+
+    # ==========================================================================
+    # 微信小程序授权登录
+    # ==========================================================================
+
+    async def wechat_login(
+        self,
+        data: WechatLoginRequest,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> Token:
+        """
+        微信小程序授权登录（注册即登录 + 社交绑定）。
+
+        流程：
+        1. 调用微信 code2session → 获取 openid + session_key
+        2. 解密手机号
+        3. 查 user_socials: 是否已有绑定？
+           - 有 → 更新 session_key，直接签发
+           - 没有 → 用手机号查 users 做合流或新建
+        4. 签发双 Token
+        """
+        assert self.social_repo is not None, "wechat_login 需要 social_repo"
+
+        # 1. 获取 openid + session_key
+        wechat_session = await code2session(data.js_code)
+
+        # 2. 解密手机号
+        phone_info = decrypt_phone_number(
+            wechat_session.session_key, data.encrypted_data, data.iv
+        )
+        phone_code = f"+{phone_info.country_code}"
+        mobile = phone_info.pure_phone_number
+
+        # 3. 查绑定记录
+        social = await self.social_repo.get_by_platform_openid(
+            platform="wechat_mini", openid=wechat_session.openid
+        )
+
+        if social:
+            # 已有绑定 → 更新 session_key → 直接签发
+            await self.social_repo.update_session_key(
+                social, wechat_session.session_key
+            )
+            user = await self.user_repo.get(str(social.user_id))
+            if not user or user.is_deleted or not user.is_active:
+                raise AppException(AuthError.ACCOUNT_LOCKED)
+            await self.user_repo.session.commit()
+            return await self._create_tokens(user_id=str(user.id))
+
+        # 没有绑定 → 用手机号做合流
+        user = await self.user_repo.get_by_mobile(phone_code, mobile)
+        is_new = False
+
+        if not user:
+            # 新建用户 (无密码)
+            user = User(
+                phone_code=phone_code,
+                mobile=mobile,
+                hashed_password=None,
+            )
+            self.user_repo.session.add(user)
+            await self.user_repo.session.flush()
+            is_new = True
+
+            logger.bind(
+                user_id=str(user.id), mobile=mobile
+            ).info("用户通过微信小程序自动注册")
+
+        if not user.is_active:
+            raise AppException(AuthError.ACCOUNT_LOCKED)
+
+        # 创建 UserSocial 绑定
+        new_social = UserSocial(
+            user_id=user.id,
+            platform="wechat_mini",
+            openid=wechat_session.openid,
+            unionid=wechat_session.unionid,
+            session_key=wechat_session.session_key,
+        )
+        await self.social_repo.create_binding(new_social)
+
+        # 绑定推荐关系 (仅新注册用户)
+        if is_new and data.inviter_id:
+            await self._bind_inviter(user.id, data.inviter_id)
+
+        # 记录登录日志
+        login_log = LoginLog(
+            actor_type="user",
+            actor_id=str(user.id),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            status=True,
+            reason="微信小程序登录成功",
+        )
+        self.user_repo.session.add(login_log)
+        await self.user_repo.session.commit()
+
+        return await self._create_tokens(user_id=str(user.id))
+
+    # ==========================================================================
+    # 推荐关系绑定 (内部方法)
+    # ==========================================================================
+
+    async def _bind_inviter(
+        self, user_id: uuid_mod.UUID, inviter_id_str: str
+    ) -> None:
+        """
+        为新注册用户绑定推荐关系。
+
+        在 user_level_profiles 中设置 inviter_id，并累加推荐人的邀请计数。
+        如果推荐人不存在或 ID 无效，静默跳过（不影响注册主流程）。
+        """
+        from app.db.models.user_level import UserLevelProfile
+        from sqlalchemy import select, update
+
+        try:
+            inviter_uuid = uuid_mod.UUID(inviter_id_str)
+
+            # 校验推荐人存在
+            inviter = await self.user_repo.get(inviter_id_str)
+            if not inviter:
+                logger.warning(f"推荐人 {inviter_id_str} 不存在，跳过绑定")
+                return
+
+            # 查找或创建当前用户的 level_profile
+            stmt = select(UserLevelProfile).where(
+                UserLevelProfile.user_id == user_id
+            )
+            result = await self.user_repo.session.execute(stmt)
+            profile = result.scalar_one_or_none()
+
+            if not profile:
+                profile = UserLevelProfile(
+                    user_id=user_id,
+                    inviter_id=inviter_uuid,
+                )
+                self.user_repo.session.add(profile)
+            else:
+                profile.inviter_id = inviter_uuid
+
+            # 推荐人邀请计数 +1
+            inviter_stmt = select(UserLevelProfile).where(
+                UserLevelProfile.user_id == inviter_uuid
+            )
+            inviter_result = await self.user_repo.session.execute(inviter_stmt)
+            inviter_profile = inviter_result.scalar_one_or_none()
+
+            if inviter_profile:
+                inviter_profile.total_invite_number += 1
+            else:
+                inviter_profile = UserLevelProfile(
+                    user_id=inviter_uuid,
+                    total_invite_number=1,
+                )
+                self.user_repo.session.add(inviter_profile)
+
+            await self.user_repo.session.flush()
+            logger.info(
+                f"推荐关系绑定成功: {user_id} ← inviter: {inviter_id_str}"
+            )
+
+        except (ValueError, Exception) as e:
+            logger.warning(f"推荐关系绑定失败 (不影响注册): {e}")
+
+    # ==========================================================================
+    # Token 刷新 (Rotation 策略)
+    # ==========================================================================
 
     async def refresh_token(self, refresh_token: str) -> Token:
         """

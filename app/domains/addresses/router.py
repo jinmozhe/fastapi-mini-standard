@@ -124,3 +124,49 @@ async def delete_address(
     await service.delete_address(user.id, address_id)
     await service.db.commit()
     return ResponseModel.success()
+
+
+# ==============================================================================
+# B 端管理员路由（仅限 aud=backend Token）
+# ==============================================================================
+
+from typing import Annotated  # noqa: E402（避免与上方 import 拆分）
+from uuid import UUID as _UUID
+
+from fastapi import Query  # noqa: E402
+
+from app.api.deps import CurrentAdmin  # noqa: E402
+from app.domains.addresses.schemas import AddressPageResult  # noqa: E402
+
+address_admin = APIRouter()
+
+
+@address_admin.get(
+    "",
+    response_model=ResponseModel[AddressPageResult],
+    summary="[B端] 查询用户收货地址列表",
+)
+async def admin_list_addresses(
+    request: Request,
+    admin: CurrentAdmin,
+    service: AddressServiceDep,
+    user_id: Annotated[_UUID | None, Query(description="按用户 ID 过滤（不传则查全部）")] = None,
+    page: Annotated[int, Query(ge=1, description="页码")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100, description="每页条数")] = 20,
+) -> ResponseModel[Any]:
+    """
+    B 端分页查询所有用户的收货地址。
+    支持按 user_id 过滤，用于运营/客服调查特定用户的地址信息。
+    """
+    rows, total = await service.repo.admin_list_all(
+        user_id=user_id,
+        page=page,
+        page_size=page_size,
+    )
+    result = AddressPageResult(
+        items=rows,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+    return ResponseModel.success(data=result)

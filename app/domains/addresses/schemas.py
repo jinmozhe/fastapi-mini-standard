@@ -100,3 +100,15 @@ class AddressSnapshot(BaseModel):
     district_code: str
     street_address: str
     postal_code: str | None
+
+
+# ==============================================================================
+# B 端分页响应（包装 AddressRead 列表 + 分页元数据）
+# ==============================================================================
+
+class AddressPageResult(BaseModel):
+    """B 端地址分页查询结果"""
+    items: list[AddressRead]
+    total: int
+    page: int
+    page_size: int

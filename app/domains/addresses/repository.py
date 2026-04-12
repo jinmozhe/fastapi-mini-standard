@@ -9,7 +9,7 @@ Created: 2026-04-12
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.address import UserAddress
@@ -73,3 +73,39 @@ class AddressRepository:
         candidate = await self.db.scalar(stmt)
         if candidate:
             candidate.is_default = True
+
+    # --------------------------------------------------------------------------
+    # B 端管理员专用方法
+    # --------------------------------------------------------------------------
+
+    async def admin_list_all(
+        self,
+        user_id: UUID | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[UserAddress], int]:
+        """
+        B 端分页查询全量地址。
+        可选按 user_id 过滤（精确匹配某个用户的全部地址）。
+        返回 (记录列表, 总条数)。
+        """
+        # 动态构建过滤条件
+        conditions = []
+        if user_id:
+            conditions.append(UserAddress.user_id == user_id)
+
+        # 查记录
+        stmt = (
+            select(UserAddress)
+            .where(*conditions)
+            .order_by(UserAddress.created_at.desc())
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+        )
+        rows = list((await self.db.scalars(stmt)).all())
+
+        # 查总数
+        count_stmt = select(func.count()).select_from(UserAddress).where(*conditions)
+        total: int = await self.db.scalar(count_stmt) or 0
+
+        return rows, total

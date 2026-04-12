@@ -23,7 +23,7 @@ from app.domains.user_wallets.router import wallet_admin, wallet_router
 from app.domains.products.router import product_admin, product_router
 from app.domains.media.router import media_admin
 from app.domains.carts.router import cart_router
-from app.domains.addresses.router import address_router
+from app.domains.addresses.router import address_router, address_admin
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -72,5 +72,9 @@ api_router.include_router(cart_router, prefix="/carts", tags=["C端购物车基�
 
 # 12. C端收货地址 (Addresses)
 api_router.include_router(address_router, prefix="/addresses", tags=["C端收货地址"])
+
+# 13. B端收货地址管理 (Addresses Admin)
+api_router.include_router(address_admin, prefix="/admin/addresses", tags=["B端收货地址管理"])
+
 
 

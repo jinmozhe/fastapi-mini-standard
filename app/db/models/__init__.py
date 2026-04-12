@@ -45,6 +45,7 @@ from app.db.models.product import (
 from app.db.models.product_view import ProductView
 from app.db.models.media import MediaAsset
 from app.db.models.cart import CartItem
+from app.db.models.address import UserAddress
 
 # 3. 显式导出 (供 Alembic 识别)
 __all__ = [
@@ -87,4 +88,6 @@ __all__ = [
     "ProductView",
     # 购物车体系
     "CartItem",
+    # 收货地址
+    "UserAddress",
 ]

@@ -35,7 +35,7 @@ class BalanceChangeType(StrEnum):
     ORDER_REFUND = "order_refund"           # 订单退款返还
     COMMISSION_FIRST = "commission_first"    # 直推佣金到账
     COMMISSION_SECOND = "commission_second"  # 间推佣金到账
-    COMMISSION_THIRD = "commission_third"    # 三级佣金到账
+    COMMISSION_OTHER = "commission_other"    # 额外佣金到账
     UPGRADE_REWARD = "upgrade_reward"        # 下级升级奖励到账
     ADMIN_RECHARGE = "admin_recharge"        # 后台手工充值（客诉补偿等）
 

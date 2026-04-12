@@ -38,8 +38,8 @@ class UserLevel(UUIDModel):
     关键设计：
     - upgrade_rules: JSONB 规则树引擎，支持 AND/OR 嵌套组合
       示例: {"op":"AND","conditions":[{"metric":"total_consume","operator":">=","value":10000}]}
-    - commission_rules: 三级分佣规则数组，rank 对应下级等级的 rank_weight
-      示例: [{"rank":1,"first":"3%","second":"2%","third":"1"}]
+    - commission_rules: 额外级分佣规则数组，rank 对应下级等级的 rank_weight
+      示例: [{"rank":1,"first":"3%","second":"2%","other":"1"}]
     - reward_rules: 下级升级奖励规则数组，结构同 commission_rules
     """
     __tablename__ = "user_levels"
@@ -63,14 +63,14 @@ class UserLevel(UUIDModel):
         comment="折扣率 (如 0.95 = 95折)",
     )
 
-    # 三级分佣规则 (JSONB 数组)
+    # 额外级分佣规则 (JSONB 数组)
     commission_rules: Mapped[list | None] = mapped_column(
-        JSONB, nullable=True, comment="分佣规则 [{'rank':1,'first':'3%','second':'2%','third':'1'}]"
+        JSONB, nullable=True, comment="分佣规则 [{'rank':1,'first':'3%','second':'2%','other':'1'}]"
     )
 
     # 下级升级奖励规则 (JSONB 数组)
     reward_rules: Mapped[list | None] = mapped_column(
-        JSONB, nullable=True, comment="升级奖励规则 [{'rank':2,'first':'100','second':'50','third':'10'}]"
+        JSONB, nullable=True, comment="升级奖励规则 [{'rank':2,'first':'100','second':'50','other':'10'}]"
     )
 
     # 等级图标
@@ -108,7 +108,7 @@ class UserLevelProfile(UUIDModel):
 
     关键设计：
     - 与 users 表 1:1 关联，通过 user_id UNIQUE 约束保证
-    - inviter_id 记录推荐关系，用于三级分佣链路追溯
+    - inviter_id 记录推荐关系，用于额外级分佣链路追溯
     - total_* 字段为历史累加器指标，仅供升降级引擎判定使用
     - is_manual 为人工锁定标识，系统计算程序将跳过此用户
     """
@@ -131,7 +131,7 @@ class UserLevelProfile(UUIDModel):
         comment="当前等级 ID",
     )
 
-    # 推荐人 ID (上级用户，用于三级分佣链路追溯)
+    # 推荐人 ID (上级用户，用于额外级分佣链路追溯)
     inviter_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),

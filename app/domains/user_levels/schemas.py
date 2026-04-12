@@ -32,10 +32,10 @@ class UserLevelCreateRequest(BaseModel):
         None, description="升级规则 (JSONB AST 规则树)"
     )
     commission_rules: list[dict[str, Any]] | None = Field(
-        None, description="分佣规则 [{'rank':1,'first':'3%','second':'2%','third':'0'}]"
+        None, description="分佣规则 [{'rank':1,'first':'3%','second':'2%','other':'0'}]"
     )
     reward_rules: list[dict[str, Any]] | None = Field(
-        None, description="升级奖励规则 [{'rank':2,'first':'100','second':'50','third':'0'}]"
+        None, description="升级奖励规则 [{'rank':2,'first':'100','second':'50','other':'0'}]"
     )
     icon_url: str | None = Field(None, max_length=500, description="等级图标 URL")
     description: str | None = Field(None, description="等级权益说明 (富文本)")

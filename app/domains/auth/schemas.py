@@ -96,6 +96,9 @@ class RegisterRequest(BaseModel):
         default=None, min_length=3, max_length=50, description="用户名 (可选，唯一)"
     )
     email: EmailStr | None = Field(default=None, description="邮箱 (可选，唯一)")
+    invite_code: str | None = Field(
+        default=None, min_length=4, max_length=20, description="邀请码 (可选，绑定推荐人)"
+    )
 
     @field_validator("phone_code", mode="before")
     @classmethod

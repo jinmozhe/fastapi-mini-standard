@@ -223,14 +223,14 @@ class CommissionService:
         current_id = user_id
 
         for _ in range(3):
-            stmt = select(UserLevelProfile.referrer_id).where(
+            stmt = select(UserLevelProfile.inviter_id).where(
                 UserLevelProfile.user_id == current_id
             )
-            referrer_id = await self.db.scalar(stmt)
-            if not referrer_id:
+            inviter_id = await self.db.scalar(stmt)
+            if not inviter_id:
                 break
-            chain.append(referrer_id)
-            current_id = referrer_id
+            chain.append(inviter_id)
+            current_id = inviter_id
 
         return chain
 
@@ -248,11 +248,10 @@ class CommissionService:
         完整版应逐商品查 商品级固定佣 → 分类级百分比佣 → 等级通用佣。
         """
         from sqlalchemy import select
-        from app.db.models.user import User
-        from app.db.models.user_level import UserLevel
+        from app.db.models.user_level import UserLevel, UserLevelProfile
 
-        # 查推荐人等级
-        stmt = select(User.level_id).where(User.id == referrer_id)
+        # 查推荐人等级（等级数据存在 UserLevelProfile 中）
+        stmt = select(UserLevelProfile.level_id).where(UserLevelProfile.user_id == referrer_id)
         level_id = await self.db.scalar(stmt)
         if not level_id:
             return Decimal("0.00")

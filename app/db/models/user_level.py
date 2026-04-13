@@ -136,7 +136,23 @@ class UserLevelProfile(UUIDModel):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
         comment="推荐人用户 ID (直接上级)",
+    )
+
+    # 用户专属邀请码（6 位字母+数字，唯一，懒生成）
+    invite_code: Mapped[str | None] = mapped_column(
+        String(20),
+        unique=True,
+        nullable=True,
+        comment="用户专属邀请码",
+    )
+
+    # 被邀请绑定时间
+    invited_at: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+        comment="被邀请绑定时间",
     )
 
     # 人工强制锁定标识 (为 true 时系统升降级程序跳过此用户)

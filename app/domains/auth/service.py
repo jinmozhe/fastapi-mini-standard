@@ -109,6 +109,22 @@ class AuthService:
         # 4. 持久化
         self.user_repo.session.add(user)
         await self.user_repo.session.flush()
+
+        # 5. 如果携带邀请码，绑定推荐关系
+        if reg_data.invite_code:
+            try:
+                from app.domains.referrals.service import ReferralService
+                referral_svc = ReferralService(self.user_repo.session)
+                await referral_svc.bind_inviter(user.id, reg_data.invite_code)
+            except Exception as e:
+                # 邀请码绑定失败不影响注册流程，仅记录日志
+                logger.warning(
+                    "invite_code_bind_failed",
+                    user_id=str(user.id),
+                    invite_code=reg_data.invite_code,
+                    error=str(e),
+                )
+
         await self.user_repo.session.commit()
         await self.user_repo.session.refresh(user)
 
@@ -116,7 +132,7 @@ class AuthService:
             "User registered successfully"
         )
 
-        # 5. 自动生成 Token (注册后自动登录)
+        # 6. 自动生成 Token (注册后自动登录)
         return await self._create_tokens(user_id=str(user.id))
 
     async def login(

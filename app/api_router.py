@@ -34,6 +34,8 @@ from app.domains.refunds.router import refund_router
 from app.domains.refunds.admin_router import refund_admin
 from app.domains.reviews.router import review_router
 from app.domains.reviews.admin_router import review_admin
+from app.domains.referrals.router import referral_router
+from app.domains.referrals.admin_router import referral_admin
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -115,3 +117,9 @@ api_router.include_router(review_router, prefix="/reviews", tags=["C端评价"])
 
 # 23. B端评价管理 (Reviews Admin)
 api_router.include_router(review_admin, prefix="/admin/reviews", tags=["B端评价管理"])
+
+# 24. C端推荐关系 (Referrals)
+api_router.include_router(referral_router, prefix="/referrals", tags=["C端推荐关系"])
+
+# 25. B端推荐管理 (Referrals Admin)
+api_router.include_router(referral_admin, prefix="/admin/referrals", tags=["B端推荐管理"])

@@ -1097,3 +1097,5 @@ OptionalCurrentUser = Annotated[User | None, Depends(get_optional_current_user)]
 购物车表（cart_items）中绝对不存储任何价格字段。  
 每次 GET /carts/my 时，必须逐条通过 ProductService 的 5 级价格引擎实时计算当前展示价。  
 这杜绝了"历史价格越权"的价格雪崩场景。
+| 运费模板 | shipping/ | 地区阶梯计价引擎 + B端模板 CRUD + 包邮条件判定 |
+| 支付 | payments/ | 余额即时扣减 + 微信支付骨架(JSAPI) + 回调幂等 + 退款引擎 |

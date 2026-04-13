@@ -547,3 +547,24 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ## 📄 License
 
 MIT © [jinmozhe](https://github.com/jinmozhe)
+
+
+### B端运费模板管理 (Shipping Templates)
+
+| 接口 | 方法 | 路径 | 说明 |
+|------|------|------|------|
+| 创建模板 | POST | /api/v1/admin/shipping-templates/ | 含地区阶梯规则，必须有其余地区兆底 |
+| 模板列表 | GET | /api/v1/admin/shipping-templates/ | 分页查询 |
+| 模板详情 | GET | /api/v1/admin/shipping-templates/{id} | 含全部地区规则 |
+| 修改模板 | PUT | /api/v1/admin/shipping-templates/{id} | 全量替换地区规则 |
+| 删除模板 | DELETE | /api/v1/admin/shipping-templates/{id} | 有商品引用时拒绝删除 |
+
+### C端支付 (Payments)
+
+| 接口 | 方法 | 路径 | 说明 |
+|------|------|------|------|
+| 查询支付状态 | GET | /api/v1/payments/{no}/status | 前端轮询微信支付结果 |
+| 微信支付回调 | POST | /api/v1/payments/wechat/notify | 微信服务器回调通知（内部接口） |
+| shipping_templates | B端 | 运费模板 | 按重量/按件数计价，含包邮门槛 |
+| shipping_template_regions | B端 | 地区运费规则 | 首重/续重阶梯，省份编码匹配 |
+| payment_records | C端 | 支付记录 | 微信支付/余额支付，包含状态机 + 退款字段 |

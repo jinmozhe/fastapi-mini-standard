@@ -210,6 +210,14 @@ class Product(UUIDModel, SoftDeleteMixin):
         comment="累计销量",
     )
 
+    # 关联运费模板（NULL = 包邮/虚拟商品不参与运费计算）
+    shipping_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("shipping_templates.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="运费模板 ID（NULL=包邮/虚拟商品）",
+    )
+
 
 # ==============================================================================
 # 3. 商品-分类多对多关联
@@ -347,6 +355,15 @@ class ProductSku(UUIDModel):
         server_default=text("true"),
         nullable=False,
         comment="是否启用",
+    )
+
+    # SKU 重量（克），用于运费计算。0 或 NULL 表示虚拟商品不参与运费
+    weight: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        default=Decimal("0.00"),
+        server_default=text("0.00"),
+        nullable=False,
+        comment="重量（克），用于运费计算",
     )
 
     # 排序

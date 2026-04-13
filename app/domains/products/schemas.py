@@ -190,6 +190,7 @@ class ProductSkuCreate(BaseModel):
     stock: int = Field(default=0, ge=0, description="库存")
     image_url: str | None = Field(default=None, max_length=500, description="SKU 专属图")
     is_active: bool = Field(default=True, description="是否启用")
+    weight: Decimal = Field(default=Decimal("0.00"), ge=0, decimal_places=2, description="重量（克），用于运费计算")
     sort_order: int = Field(default=0)
 
 
@@ -206,6 +207,7 @@ class ProductSkuRead(BaseModel):
     stock: int
     image_url: str | None
     is_active: bool
+    weight: Decimal
     sort_order: int
     # 当前用户的等级价（如果有）
     display_price: Decimal | None = Field(default=None, description="当前用户该 SKU 最终售价")

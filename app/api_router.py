@@ -36,6 +36,8 @@ from app.domains.reviews.router import review_router
 from app.domains.reviews.admin_router import review_admin
 from app.domains.referrals.router import referral_router
 from app.domains.referrals.admin_router import referral_admin
+from app.domains.withdrawals.router import withdrawal_router
+from app.domains.withdrawals.admin_router import withdrawal_admin
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -123,3 +125,9 @@ api_router.include_router(referral_router, prefix="/referrals", tags=["C端推�
 
 # 25. B端推荐管理 (Referrals Admin)
 api_router.include_router(referral_admin, prefix="/admin/referrals", tags=["B端推荐管理"])
+
+# 26. C端提现 (Withdrawals)
+api_router.include_router(withdrawal_router, prefix="/withdrawals", tags=["C端提现"])
+
+# 27. B端提现管理 (Withdrawals Admin)
+api_router.include_router(withdrawal_admin, prefix="/admin/withdrawals", tags=["B端提现管理"])

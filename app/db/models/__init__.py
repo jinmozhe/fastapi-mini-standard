@@ -52,6 +52,7 @@ from app.db.models.order import Order, OrderItem
 from app.db.models.commission import CommissionRecord
 from app.db.models.refund import RefundRecord
 from app.db.models.review import OrderReview
+from app.db.models.withdrawal import WithdrawalRecord
 
 # 3. 显式导出 (供 Alembic 识别)
 __all__ = [
@@ -110,5 +111,7 @@ __all__ = [
     "RefundRecord",
     # 订单评价
     "OrderReview",
+    # 提现记录
+    "WithdrawalRecord",
 ]
 

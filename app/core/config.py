@@ -138,6 +138,22 @@ class Settings(BaseSettings):
     WECHAT_OPEN_APP_SECRET: str = ""
 
     # --------------------------------------------------------------------------
+    # 9. WeChat Pay Settings (微信支付)
+    # --------------------------------------------------------------------------
+    # 总闸开关：开发环境关闭后余额支付正常，微信支付直接返回模拟成功
+    WECHAT_PAY_ENABLE: bool = False
+    # 微信支付商户号
+    WECHAT_PAY_MCHID: str = ""
+    # API V3 密钥（用于回调通知解密）
+    WECHAT_PAY_API_V3_KEY: str = ""
+    # 商户证书序列号
+    WECHAT_PAY_CERT_SERIAL_NO: str = ""
+    # 商户私钥文件路径（apiclient_key.pem）
+    WECHAT_PAY_PRIVATE_KEY_PATH: str = ""
+    # 支付结果回调通知地址（外网可达）
+    WECHAT_PAY_NOTIFY_URL: str = ""
+
+    # --------------------------------------------------------------------------
     # Properties (便捷属性)
     # --------------------------------------------------------------------------
     @property

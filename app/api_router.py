@@ -25,6 +25,7 @@ from app.domains.media.router import media_admin
 from app.domains.carts.router import cart_router
 from app.domains.addresses.router import address_router, address_admin
 from app.domains.shipping.router import shipping_admin
+from app.domains.payments.router import payment_router
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -79,6 +80,9 @@ api_router.include_router(address_admin, prefix="/admin/addresses", tags=["B端�
 
 # 14. B端运费模板管理 (Shipping Templates)
 api_router.include_router(shipping_admin, prefix="/admin/shipping-templates", tags=["B端运费模板"])
+
+# 15. C端支付 (Payments)
+api_router.include_router(payment_router, prefix="/payments", tags=["C端支付"])
 
 
 

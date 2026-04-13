@@ -76,6 +76,85 @@ class UserWalletRepository:
         result = await self.session.execute(stmt)
         return result.rowcount
 
+    async def freeze_balance_with_optimistic_lock(
+        self,
+        wallet_id: UUID,
+        current_version: int,
+        amount: Decimal,
+        new_version: int,
+    ) -> int:
+        """
+        佣金冻结：frozen_balance += amount（乐观锁）。
+        注意：这里不扣 balance，佣金冻结是"凭空"加入冻结区，
+        因为佣金来源于买家支付，不是从推荐人自有余额冻结。
+        """
+        stmt = (
+            update(self.model)
+            .where(
+                self.model.id == wallet_id,
+                self.model.version == current_version,
+            )
+            .values(
+                frozen_balance=self.model.frozen_balance + amount,
+                version=new_version,
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount
+
+    async def unfreeze_to_balance_with_optimistic_lock(
+        self,
+        wallet_id: UUID,
+        current_version: int,
+        amount: Decimal,
+        new_version: int,
+    ) -> int:
+        """
+        佣金释放：frozen_balance -= amount, balance += amount（乐观锁）。
+        订单完成时将冻结佣金迁移到可用余额。
+        """
+        stmt = (
+            update(self.model)
+            .where(
+                self.model.id == wallet_id,
+                self.model.version == current_version,
+                self.model.frozen_balance >= amount,  # 防穿透
+            )
+            .values(
+                frozen_balance=self.model.frozen_balance - amount,
+                balance=self.model.balance + amount,
+                version=new_version,
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount
+
+    async def deduct_frozen_with_optimistic_lock(
+        self,
+        wallet_id: UUID,
+        current_version: int,
+        amount: Decimal,
+        new_version: int,
+    ) -> int:
+        """
+        冻结扣回：frozen_balance -= amount（乐观锁）。
+        管理员强制取消订单时扣回冻结佣金。
+        """
+        stmt = (
+            update(self.model)
+            .where(
+                self.model.id == wallet_id,
+                self.model.version == current_version,
+                self.model.frozen_balance >= amount,  # 防穿透
+            )
+            .values(
+                frozen_balance=self.model.frozen_balance - amount,
+                version=new_version,
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount
+
 
 class UserBalanceLogRepository:
     def __init__(self, session: AsyncSession):
@@ -87,4 +166,5 @@ class UserPointLogRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.model = UserPointLog
+
 

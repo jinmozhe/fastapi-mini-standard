@@ -197,3 +197,173 @@ class UserWalletService:
         )
 
         return wallet
+
+    # --------------------------------------------------------------------------
+    # 佣金冻结/释放/扣回引擎
+    # --------------------------------------------------------------------------
+
+    async def freeze_commission(
+        self,
+        user_id: UUID,
+        amount: Decimal,
+        ref_id: UUID | None = None,
+        remark: str | None = None,
+    ) -> UserWallet:
+        """
+        佣金冻结：将佣金金额加入 frozen_balance。
+        佣金来源于买家支付，不从推荐人自有余额扣减。
+        """
+        if amount <= Decimal("0.00"):
+            raise AppException(WalletError.INVALID_AMOUNT, message="冻结金额必须大于0")
+
+        async with self.db.begin():
+            wallet = await self.get_or_create_wallet(user_id)
+            current_version = wallet.version
+            new_version = current_version + 1
+
+            affected = await self.wallet_repo.freeze_balance_with_optimistic_lock(
+                wallet_id=wallet.id,
+                current_version=current_version,
+                amount=amount,
+                new_version=new_version,
+            )
+            if affected == 0:
+                raise AppException(WalletError.CONCURRENT_UPDATE_FAILED, message="佣金冻结处理繁忙，请重试")
+
+            before_frozen = wallet.frozen_balance
+            after_frozen = before_frozen + amount
+            wallet.frozen_balance = after_frozen
+            wallet.version = new_version
+
+            # 冻结流水
+            log = UserBalanceLog(
+                user_id=user_id,
+                change_type=BalanceChangeType.COMMISSION_FREEZE,
+                amount=amount,
+                before_balance=before_frozen,
+                after_balance=after_frozen,
+                ref_id=ref_id,
+                remark=remark or "佣金冻结",
+            )
+            self.db.add(log)
+
+        logger.info(
+            "wallet_commission_frozen",
+            user_id=str(user_id),
+            amount=str(amount),
+            after_frozen=str(after_frozen),
+            ref_id=str(ref_id),
+        )
+        return wallet
+
+    async def unfreeze_commission(
+        self,
+        user_id: UUID,
+        amount: Decimal,
+        ref_id: UUID | None = None,
+        remark: str | None = None,
+    ) -> UserWallet:
+        """
+        佣金释放：frozen_balance → balance。
+        订单完成时将冻结佣金迁移到可用余额。
+        """
+        if amount <= Decimal("0.00"):
+            raise AppException(WalletError.INVALID_AMOUNT, message="释放金额必须大于0")
+
+        async with self.db.begin():
+            wallet = await self.get_or_create_wallet(user_id)
+            current_version = wallet.version
+            new_version = current_version + 1
+
+            affected = await self.wallet_repo.unfreeze_to_balance_with_optimistic_lock(
+                wallet_id=wallet.id,
+                current_version=current_version,
+                amount=amount,
+                new_version=new_version,
+            )
+            if affected == 0:
+                raise AppException(WalletError.CONCURRENT_UPDATE_FAILED, message="佣金释放处理繁忙，请重试")
+
+            wallet.frozen_balance -= amount
+            wallet.balance += amount
+            wallet.version = new_version
+
+            # 释放流水
+            log = UserBalanceLog(
+                user_id=user_id,
+                change_type=BalanceChangeType.COMMISSION_SETTLE,
+                amount=amount,
+                before_balance=wallet.balance - amount,
+                after_balance=wallet.balance,
+                ref_id=ref_id,
+                remark=remark or "佣金释放到可用余额",
+            )
+            self.db.add(log)
+
+        logger.info(
+            "wallet_commission_settled",
+            user_id=str(user_id),
+            amount=str(amount),
+            ref_id=str(ref_id),
+        )
+        return wallet
+
+    async def revoke_frozen_commission(
+        self,
+        user_id: UUID,
+        amount: Decimal,
+        ref_id: UUID | None = None,
+        remark: str | None = None,
+    ) -> UserWallet:
+        """
+        佣金扣回：从 frozen_balance 扣除。
+        管理员强制取消订单时调用，从冻结区扣回，100% 安全。
+        """
+        if amount <= Decimal("0.00"):
+            raise AppException(WalletError.INVALID_AMOUNT, message="扣回金额必须大于0")
+
+        async with self.db.begin():
+            wallet = await self.get_or_create_wallet(user_id)
+            current_version = wallet.version
+            new_version = current_version + 1
+
+            affected = await self.wallet_repo.deduct_frozen_with_optimistic_lock(
+                wallet_id=wallet.id,
+                current_version=current_version,
+                amount=amount,
+                new_version=new_version,
+            )
+            if affected == 0:
+                logger.warning(
+                    "wallet_commission_revoke_failed",
+                    user_id=str(user_id),
+                    amount=str(amount),
+                    frozen_balance=str(wallet.frozen_balance),
+                )
+                raise AppException(WalletError.CONCURRENT_UPDATE_FAILED, message="佣金扣回处理繁忙，请重试")
+
+            before_frozen = wallet.frozen_balance
+            after_frozen = before_frozen - amount
+            wallet.frozen_balance = after_frozen
+            wallet.version = new_version
+
+            # 扣回流水
+            log = UserBalanceLog(
+                user_id=user_id,
+                change_type=BalanceChangeType.COMMISSION_REVOKE,
+                amount=-amount,
+                before_balance=before_frozen,
+                after_balance=after_frozen,
+                ref_id=ref_id,
+                remark=remark or "取消订单扣回佣金",
+            )
+            self.db.add(log)
+
+        logger.info(
+            "wallet_commission_revoked",
+            user_id=str(user_id),
+            amount=str(amount),
+            ref_id=str(ref_id),
+        )
+        return wallet
+

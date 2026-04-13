@@ -26,6 +26,8 @@ from app.domains.carts.router import cart_router
 from app.domains.addresses.router import address_router, address_admin
 from app.domains.shipping.router import shipping_admin
 from app.domains.payments.router import payment_router
+from app.domains.orders.router import order_router
+from app.domains.orders.admin_router import order_admin
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -84,5 +86,8 @@ api_router.include_router(shipping_admin, prefix="/admin/shipping-templates", ta
 # 15. C端支付 (Payments)
 api_router.include_router(payment_router, prefix="/payments", tags=["C端支付"])
 
+# 16. C端订单 (Orders)
+api_router.include_router(order_router, prefix="/orders", tags=["C端订单"])
 
-
+# 17. B端订单管理 (Orders Admin)
+api_router.include_router(order_admin, prefix="/admin/orders", tags=["B端订单管理"])

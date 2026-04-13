@@ -29,6 +29,11 @@ class BalanceChangeType(StrEnum):
     WITHDRAW_REJECT = "withdraw_reject"  # 提现驳回解冻
     ADMIN_DEDUCT = "admin_deduct"  # 后台手工扣款
 
+    # ---- 佣金冻结类 ----
+    COMMISSION_FREEZE = "commission_freeze"    # 佣金进入冻结余额
+    COMMISSION_SETTLE = "commission_settle"    # 冻结佣金释放到可用余额
+    COMMISSION_REVOKE = "commission_revoke"    # 从冻结余额扣回佣金（取消订单）
+
 
 class PointChangeType(StrEnum):
     """积分变动类型"""

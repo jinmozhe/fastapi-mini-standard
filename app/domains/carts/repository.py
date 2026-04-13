@@ -59,6 +59,14 @@ class CartRepository:
         stmt = self._build_identity_filter(stmt, user_id, anonymous_id)
         return await self.db.scalar(stmt)
 
+    async def get_by_id_for_user(self, item_id: UUID, user_id: UUID) -> Optional[CartItem]:
+        """按 item_id + user_id 查询（订单域调用）"""
+        stmt = select(CartItem).where(
+            CartItem.id == item_id,
+            CartItem.user_id == user_id,
+        )
+        return await self.db.scalar(stmt)
+
     async def batch_delete(
         self, ids: list[UUID], user_id: Optional[UUID], anonymous_id: Optional[str]
     ) -> None:

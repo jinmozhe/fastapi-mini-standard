@@ -8,7 +8,7 @@ Created: 2026-04-12
 
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.product import (
@@ -108,7 +108,30 @@ class ProductRepository:
         result = await self.db.scalars(stmt)
         return list(result.all())
 
+    async def deduct_stock(self, product_id: UUID, quantity: int) -> bool:
+        """
+        无 SKU 商品的乐观锁库存扣减。
+        UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty
+        """
+        stmt = (
+            update(Product)
+            .where(
+                Product.id == product_id,
+                Product.stock >= quantity,
+            )
+            .values(stock=Product.stock - quantity)
+        )
+        result = await self.db.execute(stmt)
+        return result.rowcount > 0
 
+    async def restore_stock(self, product_id: UUID, quantity: int) -> None:
+        """取消订单时恢复无 SKU 商品库存"""
+        stmt = (
+            update(Product)
+            .where(Product.id == product_id)
+            .values(stock=Product.stock + quantity)
+        )
+        await self.db.execute(stmt)
 class ProductCategoryRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -193,6 +216,31 @@ class ProductSkuRepository:
             self.db.add(sku)
             new_skus.append(sku)
         return new_skus
+
+    async def deduct_stock(self, sku_id: UUID, quantity: int) -> bool:
+        """
+        SKU 乐观锁库存扣减。
+        UPDATE product_skus SET stock = stock - :qty WHERE id = :id AND stock >= :qty
+        """
+        stmt = (
+            update(ProductSku)
+            .where(
+                ProductSku.id == sku_id,
+                ProductSku.stock >= quantity,
+            )
+            .values(stock=ProductSku.stock - quantity)
+        )
+        result = await self.db.execute(stmt)
+        return result.rowcount > 0
+
+    async def restore_stock(self, sku_id: UUID, quantity: int) -> None:
+        """取消订单时恢复 SKU 库存"""
+        stmt = (
+            update(ProductSku)
+            .where(ProductSku.id == sku_id)
+            .values(stock=ProductSku.stock + quantity)
+        )
+        await self.db.execute(stmt)
 
 
 class ProductLevelPriceRepository:

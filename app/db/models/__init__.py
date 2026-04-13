@@ -48,6 +48,8 @@ from app.db.models.cart import CartItem
 from app.db.models.address import UserAddress
 from app.db.models.shipping import ShippingTemplate, ShippingTemplateRegion
 from app.db.models.payment import PaymentRecord
+from app.db.models.order import Order, OrderItem
+from app.db.models.commission import CommissionRecord
 
 # 3. 显式导出 (供 Alembic 识别)
 __all__ = [
@@ -97,5 +99,10 @@ __all__ = [
     "ShippingTemplateRegion",
     # 支付记录
     "PaymentRecord",
+    # 订单体系
+    "Order",
+    "OrderItem",
+    # 佣金记录
+    "CommissionRecord",
 ]
 

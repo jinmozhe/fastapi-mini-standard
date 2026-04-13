@@ -218,6 +218,15 @@ class Product(UUIDModel, SoftDeleteMixin):
         comment="运费模板 ID（NULL=包邮/虚拟商品）",
     )
 
+    # 是否允许退款退货（虚拟商品/特定商品设为 False）
+    refundable: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default=text("true"),
+        nullable=False,
+        comment="是否允许退款退货",
+    )
+
 
 # ==============================================================================
 # 3. 商品-分类多对多关联

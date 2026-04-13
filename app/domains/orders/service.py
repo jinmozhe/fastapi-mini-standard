@@ -442,28 +442,16 @@ class OrderService:
         logger.info("order_cancelled_by_user", order_no=order.order_no)
 
     # --------------------------------------------------------------------------
-    # 5. 确认收货
+    # 5. 确认收货（委托到 fulfillment 域）
     # --------------------------------------------------------------------------
     async def confirm_order(self, user_id: UUID, order_id: UUID) -> None:
-        """买家确认收货"""
-        order = await self.repo.get_by_id(order_id)
-        if not order or order.user_id != user_id:
-            raise AppException(OrderError.NOT_FOUND)
-
-        if order.status != OrderStatus.SHIPPED:
-            raise AppException(OrderError.INVALID_STATUS)
-
-        now_iso = datetime.now(timezone.utc).isoformat()
-        order.status = OrderStatus.COMPLETED
-        order.completed_at = now_iso
-
-        # 释放冻结佣金（payment 模式）或计算佣金（completion 模式）
-        await self.commission_service.release_commissions(order)
-
-        logger.info("order_completed", order_no=order.order_no)
+        """买家确认收货 → 委托到 FulfillmentService"""
+        from app.domains.fulfillment.service import FulfillmentService
+        fulfillment_svc = FulfillmentService(self.db)
+        await fulfillment_svc.confirm_order(user_id, order_id)
 
     # --------------------------------------------------------------------------
-    # 6. B 端发货
+    # 6. B 端发货（委托到 fulfillment 域）
     # --------------------------------------------------------------------------
     async def ship_order(
         self,
@@ -471,25 +459,10 @@ class OrderService:
         shipping_company: str,
         tracking_number: str,
     ) -> None:
-        """管理员发货"""
-        order = await self.repo.get_by_id(order_id)
-        if not order:
-            raise AppException(OrderError.NOT_FOUND)
-
-        if order.status != OrderStatus.PENDING_SHIPMENT:
-            raise AppException(OrderError.INVALID_STATUS)
-
-        now_iso = datetime.now(timezone.utc).isoformat()
-        order.status = OrderStatus.SHIPPED
-        order.shipping_company = shipping_company
-        order.tracking_number = tracking_number
-        order.shipped_at = now_iso
-
-        logger.info(
-            "order_shipped",
-            order_no=order.order_no,
-            tracking=tracking_number,
-        )
+        """管理员发货 → 委托到 FulfillmentService"""
+        from app.domains.fulfillment.service import FulfillmentService
+        fulfillment_svc = FulfillmentService(self.db)
+        await fulfillment_svc.ship_order(order_id, shipping_company, tracking_number)
 
     # --------------------------------------------------------------------------
     # 7. 管理员强制取消（退款+扣回佣金）

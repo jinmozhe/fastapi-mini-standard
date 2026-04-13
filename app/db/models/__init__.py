@@ -50,6 +50,8 @@ from app.db.models.shipping import ShippingTemplate, ShippingTemplateRegion
 from app.db.models.payment import PaymentRecord
 from app.db.models.order import Order, OrderItem
 from app.db.models.commission import CommissionRecord
+from app.db.models.refund import RefundRecord
+from app.db.models.review import OrderReview
 
 # 3. 显式导出 (供 Alembic 识别)
 __all__ = [
@@ -104,5 +106,9 @@ __all__ = [
     "OrderItem",
     # 佣金记录
     "CommissionRecord",
+    # 售后退款
+    "RefundRecord",
+    # 订单评价
+    "OrderReview",
 ]
 

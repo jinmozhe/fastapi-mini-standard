@@ -28,6 +28,12 @@ from app.domains.shipping.router import shipping_admin
 from app.domains.payments.router import payment_router
 from app.domains.orders.router import order_router
 from app.domains.orders.admin_router import order_admin
+from app.domains.fulfillment.router import fulfillment_router
+from app.domains.fulfillment.admin_router import fulfillment_admin
+from app.domains.refunds.router import refund_router
+from app.domains.refunds.admin_router import refund_admin
+from app.domains.reviews.router import review_router
+from app.domains.reviews.admin_router import review_admin
 
 # 创建根 API 路由
 api_router = APIRouter()
@@ -91,3 +97,21 @@ api_router.include_router(order_router, prefix="/orders", tags=["C端订单"])
 
 # 17. B端订单管理 (Orders Admin)
 api_router.include_router(order_admin, prefix="/admin/orders", tags=["B端订单管理"])
+
+# 18. C端履约 (Fulfillment)
+api_router.include_router(fulfillment_router, prefix="/orders", tags=["C端履约"])
+
+# 19. B端履约管理 (Fulfillment Admin)
+api_router.include_router(fulfillment_admin, prefix="/admin/orders", tags=["B端履约管理"])
+
+# 20. C端售后 (Refunds)
+api_router.include_router(refund_router, prefix="/refunds", tags=["C端售后退款"])
+
+# 21. B端售后管理 (Refunds Admin)
+api_router.include_router(refund_admin, prefix="/admin/refunds", tags=["B端售后管理"])
+
+# 22. C端评价 (Reviews)
+api_router.include_router(review_router, prefix="/reviews", tags=["C端评价"])
+
+# 23. B端评价管理 (Reviews Admin)
+api_router.include_router(review_admin, prefix="/admin/reviews", tags=["B端评价管理"])

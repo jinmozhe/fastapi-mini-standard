@@ -18,6 +18,7 @@ Description: 超级管理员初始化种子脚本
 
 Author: jinmozhe
 Created: 2026-04-12
+Updated: 2026-04-13 (覆盖全部 B 端 RBAC 权限点)
 """
 
 import asyncio
@@ -56,34 +57,112 @@ SEED_PASSWORD: str = os.getenv("SEED_ADMIN_PASSWORD", "Admin@2026!")
 SEED_REAL_NAME: str = os.getenv("SEED_ADMIN_REAL_NAME", "超级管理员")
 
 # ==============================================================================
-# 基础权限点定义（用于系统初始化）
+# 完整权限点定义（覆盖全部 B 端操作）
 # 格式：(code, name, type)
+#
+# type 说明：
+#   menu   = 菜单级（左侧导航栏可见）
+#   button = 按钮级（具体操作权限）
 # ==============================================================================
 
 INITIAL_PERMISSIONS: list[tuple[str, str, str]] = [
-    ("dashboard:view",  "仪表盘",       "menu"),
-    ("user:view",       "用户管理",     "menu"),
-    ("user:create",     "新增用户",     "button"),
-    ("user:edit",       "编辑用户",     "button"),
-    ("user:ban",        "封禁/解封用户", "button"),
-    ("admin:view",      "管理员管理",   "menu"),
-    ("admin:create",    "新增管理员",   "button"),
-    ("admin:edit",      "编辑管理员",   "button"),
-    ("role:view",       "角色管理",     "menu"),
-    ("role:create",     "新增角色",     "button"),
-    ("role:edit",       "编辑角色",     "button"),
-    ("permission:view", "权限管理",     "menu"),
-    ("log:view",        "日志查看",     "menu"),
-    ("order:view",      "订单查看",     "menu"),
-    ("order:refund",    "订单退款",     "button"),
-    ("finance:view",    "财务报表",     "menu"),
-    ("finance:export",  "财务数据导出", "button"),
-    # 会员等级管理权限
-    ("user_level:view",     "会员等级查看",     "menu"),
-    ("user_level:create",   "新增会员等级",     "button"),
-    ("user_level:edit",     "编辑会员等级",     "button"),
-    ("user_level:delete",   "删除会员等级",     "button"),
-    ("user_level:override", "强制指定用户等级", "button"),
+    # ========== 仪表盘 ==========
+    ("dashboard:view",          "仪表盘",               "menu"),
+
+    # ========== 管理员管理 ==========
+    ("admin:view",              "管理员列表",           "menu"),
+    ("admin:create",            "新增管理员",           "button"),
+    ("admin:edit",              "编辑管理员",           "button"),
+
+    # ========== 角色管理 ==========
+    ("role:view",               "角色列表",             "menu"),
+    ("role:create",             "新增角色",             "button"),
+    ("role:edit",               "编辑角色",             "button"),
+
+    # ========== 权限管理 ==========
+    ("permission:view",         "权限列表",             "menu"),
+
+    # ========== 用户管理 ==========
+    ("user:view",               "用户列表",             "menu"),
+    ("user:create",             "新增用户",             "button"),
+    ("user:edit",               "编辑用户",             "button"),
+    ("user:ban",                "封禁/解封用户",        "button"),
+
+    # ========== 会员等级管理 ==========
+    ("user_level:view",         "会员等级列表",         "menu"),
+    ("user_level:create",       "新增会员等级",         "button"),
+    ("user_level:edit",         "编辑会员等级",         "button"),
+    ("user_level:delete",       "删除会员等级",         "button"),
+    ("user_level:override",     "强制指定用户等级",     "button"),
+
+    # ========== 资金监管 ==========
+    ("wallet:view",             "资金监管列表",         "menu"),
+    ("wallet:recharge",         "手工充值",             "button"),
+    ("wallet:deduct",           "手工扣款",             "button"),
+    ("wallet:grant_points",     "手工发放积分",         "button"),
+    ("wallet:revoke_points",    "手工扣除积分",         "button"),
+
+    # ========== 商品管理 ==========
+    ("product:view",            "商品列表",             "menu"),
+    ("product:create",          "新增商品",             "button"),
+    ("product:edit",            "编辑商品",             "button"),
+    ("product:delete",          "删除商品",             "button"),
+    ("product:sku",             "SKU 管理",             "button"),
+    ("product:category",        "分类管理",             "button"),
+
+    # ========== 媒体素材库 ==========
+    ("media:view",              "媒体素材列表",         "menu"),
+    ("media:upload",            "上传素材",             "button"),
+    ("media:delete",            "删除素材",             "button"),
+
+    # ========== 收货地址管理 ==========
+    ("address:view",            "收货地址列表",         "menu"),
+
+    # ========== 运费模板 ==========
+    ("shipping:view",           "运费模板列表",         "menu"),
+    ("shipping:create",         "新增运费模板",         "button"),
+    ("shipping:edit",           "编辑运费模板",         "button"),
+    ("shipping:delete",         "删除运费模板",         "button"),
+
+    # ========== 订单管理 ==========
+    ("order:view",              "订单列表",             "menu"),
+    ("order:detail",            "订单详情",             "button"),
+    ("order:cancel",            "强制取消订单",         "button"),
+
+    # ========== 履约管理 ==========
+    ("fulfillment:view",        "履约管理",             "menu"),
+    ("fulfillment:ship",        "发货",                 "button"),
+    ("fulfillment:batch_ship",  "批量发货",             "button"),
+    ("fulfillment:auto_confirm","自动确认收货",         "button"),
+
+    # ========== 售后管理 ==========
+    ("refund:view",             "售后列表",             "menu"),
+    ("refund:detail",           "售后详情",             "button"),
+    ("refund:review",           "审核退款",             "button"),
+    ("refund:confirm_return",   "确认收到退货",         "button"),
+
+    # ========== 评价管理 ==========
+    ("review:view",             "评价列表",             "menu"),
+    ("review:reply",            "回复评价",             "button"),
+    ("review:visibility",       "设置评价可见性",       "button"),
+
+    # ========== 推荐关系管理 ==========
+    ("referral:view",           "推荐关系列表",         "menu"),
+    ("referral:bind",           "手动绑定推荐人",       "button"),
+    ("referral:unbind",         "解除推荐关系",         "button"),
+
+    # ========== 提现管理 ==========
+    ("withdrawal:view",         "提现列表",             "menu"),
+    ("withdrawal:detail",       "提现详情",             "button"),
+    ("withdrawal:review",       "审核提现",             "button"),
+    ("withdrawal:complete",     "确认打款完成",         "button"),
+
+    # ========== 日志审计 ==========
+    ("log:view",                "日志查看",             "menu"),
+
+    # ========== 财务报表 ==========
+    ("finance:view",            "财务报表",             "menu"),
+    ("finance:export",          "财务数据导出",         "button"),
 ]
 
 SUPER_ADMIN_ROLE_CODE: str = "SUPER_ADMIN"
@@ -106,6 +185,8 @@ async def seed() -> None:
         # ------------------------------------------------------------------
         print("\n[STEP 1] 初始化基础权限点 (sys_permissions)...")
         perm_ids: list[str] = []
+        created_count = 0
+        skipped_count = 0
 
         for code, name, ptype in INITIAL_PERMISSIONS:
             existing = await session.execute(
@@ -114,14 +195,17 @@ async def seed() -> None:
             perm = existing.scalar_one_or_none()
 
             if perm:
-                print(f"  [SKIP] 已存在: [{code}] {name}")
+                skipped_count += 1
                 perm_ids.append(str(perm.id))
             else:
                 new_perm = SysPermission(code=code, name=name, type=ptype)
                 session.add(new_perm)
                 await session.flush()
                 perm_ids.append(str(new_perm.id))
+                created_count += 1
                 print(f"  [OK]   创建权限点: [{code}] {name}")
+
+        print(f"  新增 {created_count} 个，跳过 {skipped_count} 个，总计 {len(perm_ids)} 个权限点")
 
         # ------------------------------------------------------------------
         # Step 2：创建超级管理员角色（幂等）
@@ -149,6 +233,7 @@ async def seed() -> None:
         # Step 3：绑定所有权限到超级管理员角色（幂等）
         # ------------------------------------------------------------------
         print("\n[STEP 3] 绑定权限到角色...")
+        bind_count = 0
         for perm_id in perm_ids:
             existing_bind = await session.execute(
                 select(sys_role_permission_table).where(
@@ -164,7 +249,8 @@ async def seed() -> None:
                     permission_id=perm_id,
                 )
             )
-        print(f"  [OK]   已确保 {len(perm_ids)} 个权限点绑定到 [{SUPER_ADMIN_ROLE_CODE}]")
+            bind_count += 1
+        print(f"  [OK]   新增绑定 {bind_count} 个，总计 {len(perm_ids)} 个权限点绑定到 [{SUPER_ADMIN_ROLE_CODE}]")
 
         # ------------------------------------------------------------------
         # Step 4：创建超级管理员账号（幂等）
@@ -220,6 +306,7 @@ async def seed() -> None:
         print(f"\n管理员登录信息:")
         print(f"  用户名: {SEED_USERNAME}")
         print(f"  密  码: {SEED_PASSWORD}")
+        print(f"  权限数: {len(perm_ids)} 个")
         print(f"\n登录接口: POST /api/v1/admin/login")
         print(f"\n[WARN] 请在生产环境部署后立即修改默认密码!")
         print("=" * 60)

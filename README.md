@@ -251,6 +251,12 @@
 | 设置默认 | `PATCH` | `/api/v1/addresses/{id}/set-default` | 互斥引擎：原子事务保证唯一默认 |
 | 删除地址 | `DELETE` | `/api/v1/addresses/{id}` | 物理删除；若删的是默认，自动晋升最早创建的地址 |
 
+### B端收货地址管理 (Addresses Admin)
+
+| 接口 | 方法 | 路径 | 说明 |
+|------|------|------|------|
+| 地址查询 | `GET` | `/api/v1/admin/addresses/` | 分页查询全部用户地址，支持按 user_id 精确过滤 |
+
 ---
 
 ### 数据模型一览

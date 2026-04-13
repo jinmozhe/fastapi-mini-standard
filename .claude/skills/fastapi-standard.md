@@ -93,6 +93,15 @@ scripts/                 # 运维脚本
 | 微信 | `wechat.py` | 小程序code2session + 开放平台OAuth + AES解密 |
 | 校验 | `validators.py` | 共享正则常量 (手机号/区号) |
 
+### 已落地业务领域模块 (pp/domains/)
+
+| 领域 | 模块 | 职责 |
+|------|------|------|
+| 媒体 | media/ | Pillow AOT 图片派生 (1080px _large / 400px _thumb) + LocalStorageProvider |
+| 商品 | products/ | 5级价格引擎 + 3级分佣引擎 + SKU + 分类树 + UPSERT 足迹 |
+| 购物车 | carts/ | OptionalCurrentUser + X-Device-Id 双轨身份 + 游客合并算法 |
+| 收货地址 | ddresses/ | 行政编码双存 + is_default 互斥引擎 + AddressSnapshot 快照预留 + B端分页查询 |
+
 ---
 
 ## 📚 核心工程规范
@@ -441,6 +450,8 @@ Created: 2026-01-15
 - [ ] **JWT 双端 `aud` 隔离**：B 端 Token 必须在 Payload 中注入 `aud: "backend"`，C 端 Token 注入 `aud: "frontend"`。`deps.py` 中的 `get_current_user` 和 `get_current_admin` 必须分别校验 `aud` 字段，拒绝跨端访问。
 - [ ] **AuditLogMiddleware 全量拦截规范**：`AuditLogMiddleware` 必须拦截 `/admin/` 路径下的所有请求（含 GET），采用旁路独立 Session 提交，写入失败不得阻塞主请求（Fail-Open）。请求体中的 password/token 等敏感字段必须自动脱敏为 `***` 后再落库。
 - [ ] **超级管理员种子脚本 (`seed_admin.py`)**：每个项目必须在 `scripts/seed_admin.py` 中提供幂等的超级管理员初始化脚本。该脚本需创建基础权限树、SUPER_ADMIN 角色并完成绑定。支持通过环境变量 `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD` 自定义账密。
+- [ ] **购物车 X-Device-Id 双轨鉴权**：小程序购物车等支持游客态的接口，必须使用 OptionalCurrentUser，不得强制登录验证。兼容身份优先级：user_id (Token) > nonymous_id (X-Device-Id)。
+- [ ] **订单地址快照铁律**：订单表中禁止保存 ddress_id 外键，必须调用 AddressService.get_snapshot() 将地址全量字段拷贝入订单表的 JSONB 字段。这确保用户修改/删除地址不影响历史订单。
 
 #### G. 多渠道认证与社交绑定安全 (Auth Multi-Channel)
 - [ ] **手机号锚点原则**：手机号是唯一身份标识，所有登录链路最终必须绑定手机号。密码字段必须可选 (`nullable=True`)，支持无密码注册。
